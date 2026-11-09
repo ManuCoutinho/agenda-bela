@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-marca: #c2185b;
+  --color-marcado: #1565c0;
+  --color-livre: #2e7d32;
+  --color-bloqueado: #616161;
+  --color-pendente: #f9a825;
+}
+
+html {
+  font-size: 16px;
+}

@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Desenvolvimento: UID de quem está desenvolvendo. Na entrega, trocar pelo UID da manicure.
+    function uidDaManicure() {
+      return 'UID_DA_MANICURE';
+    }
+
+    function isOwner() {
+      return request.auth != null && request.auth.uid == uidDaManicure();
+    }
+
+    match /config/{doc} {
+      allow read: if doc == 'publico' || isOwner();
+      allow write: if isOwner();
+    }
+    match /clientes/{id}      { allow read, write: if isOwner(); }
+    match /agendamentos/{id}  { allow read, write: if isOwner(); }
+    match /bloqueios/{id}     { allow read, write: if isOwner(); }
+
+    match /pedidos/{id} {
+      // a trava listada no pedido precisa existir, pendente, ao fim do mesmo lote
+      function travaPendente(travaId) {
+        let t = getAfter(/databases/$(database)/documents/travas/$(travaId));
+        return t != null && t.data.expiraEm != null && t.data.expiraEm > request.time;
+      }
+      function travaNaPosicao(travas, i) {
+        return travas.size() <= i || travaPendente(travas[i]);
+      }
+
+      allow read, update, delete: if isOwner();
+      allow create: if request.resource.data.keys().hasOnly(
+          ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
+        && request.resource.data.keys().hasAll(
+          ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.nome.size() <= 80
+        && request.resource.data.whatsapp is string
+        && request.resource.data.whatsapp.matches('^[0-9]{12,13}$')
+        && request.resource.data.servicoId is string
+        && request.resource.data.consentimento == true
+        && request.resource.data.status == 'pendente'
+        && request.resource.data.criadoEm == request.time
+        // RN03 no servidor: nada no passado nem além de 31 dias
+        && request.resource.data.inicio is timestamp
+        && request.resource.data.inicio > request.time
+        && request.resource.data.inicio < request.time + duration.value(31, 'd')
+        // até 10 blocos de 30 min (5 h), todos travados no mesmo lote
+        && request.resource.data.travas is list
+        && request.resource.data.travas.size() >= 1
+        && request.resource.data.travas.size() <= 10
+        && travaNaPosicao(request.resource.data.travas, 0)
+        && travaNaPosicao(request.resource.data.travas, 1)
+        && travaNaPosicao(request.resource.data.travas, 2)
+        && travaNaPosicao(request.resource.data.travas, 3)
+        && travaNaPosicao(request.resource.data.travas, 4)
+        && travaNaPosicao(request.resource.data.travas, 5)
+        && travaNaPosicao(request.resource.data.travas, 6)
+        && travaNaPosicao(request.resource.data.travas, 7)
+        && travaNaPosicao(request.resource.data.travas, 8)
+        && travaNaPosicao(request.resource.data.travas, 9);
+    }
+
+    match /travas/{id} {
+      function travaValida() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['data', 'hora', 'expiraEm'])
+          && d.data is string
+          && d.hora is string
+          && id == d.data + '_' + d.hora
+          && d.expiraEm is timestamp
+          && d.expiraEm > request.time
+          && d.expiraEm <= request.time + duration.value(24, 'h');
+      }
+      allow read: if true;
+      allow create: if isOwner() || travaValida();
+      // a cliente só sobrescreve uma trava que já expirou
+      allow update: if isOwner()
+        || (resource.data.expiraEm != null
+            && resource.data.expiraEm < request.time
+            && travaValida());
+      allow delete: if isOwner();
+    }
+  }
+}

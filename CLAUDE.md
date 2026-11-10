@@ -46,7 +46,7 @@ Testes ao lado do arquivo (`.test.ts(x)`); testes de regras em `testes/regras/`.
 
 ## Convenções
 
-- Domínio em português (`Agendamento`, `travas`, `horariosLivres`); convenções do ecossistema em inglês (`use…`, `on…`).
+- Domínio em inglês (`Agendamento`, `travas`, `horariosLivres`); convenções do ecossistema em inglês (`use…`, `on…`).
 - Datas: fuso `America/Sao_Paulo`, `date-fns` + `@date-fns/tz` com `ptBR`; IDs de trava `AAAA-MM-DD_HHmm`.
 - Mensagens à usuária dizem o que fazer, sem códigos técnicos. Sem `console.log`.
 - Acessibilidade: alvos ≥ 44 px (`min-h-11`), texto ≥ 16 px, rótulo em todo campo, contraste 4,5:1.

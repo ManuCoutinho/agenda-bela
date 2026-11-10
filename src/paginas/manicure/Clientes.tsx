@@ -1,16 +1,18 @@
 import { useId, useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link } from 'react-router';
+import Aviso from '../../componentes/Aviso';
 import Campo from '../../componentes/Campo';
 import LinkBotao from '../../componentes/LinkBotao';
 import { ESTILO_CAMPO, ESTILO_LINK } from '../../componentes/estilos';
 import { buscarClientes, formatarWhatsApp } from '../../dominio/clientes';
 import { linkWhatsApp } from '../../dominio/whatsapp';
+import { useAviso } from '../../hooks/useAviso';
 import { useClientes } from '../../hooks/useClientes';
 
 export default function Clientes() {
   const { clientes, carregando, erro } = useClientes();
   const [termo, setTermo] = useState('');
-  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso;
+  const aviso = useAviso();
   const idBusca = useId();
   const encontradas = buscarClientes(clientes, termo);
 
@@ -21,11 +23,7 @@ export default function Clientes() {
         <LinkBotao to="/clientes/nova">Nova cliente</LinkBotao>
       </div>
 
-      {aviso && (
-        <p role="status" className="mt-4 rounded-lg bg-marca-suave p-3">
-          {aviso}
-        </p>
-      )}
+      <Aviso texto={aviso} />
 
       {carregando && (
         <p role="status" className="mt-6 text-texto-suave">

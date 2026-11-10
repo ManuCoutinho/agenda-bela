@@ -1,12 +1,14 @@
-import { Link, useLocation } from 'react-router';
+import { Link } from 'react-router';
+import Aviso from '../../componentes/Aviso';
 import LinkBotao from '../../componentes/LinkBotao';
 import { ESTILO_LINK } from '../../componentes/estilos';
 import { formatarDuracao, formatarPreco } from '../../dominio/servicos';
+import { useAviso } from '../../hooks/useAviso';
 import { useServicos } from '../../hooks/useServicos';
 
 export default function Servicos() {
   const { servicos, carregando, erro } = useServicos();
-  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso;
+  const aviso = useAviso();
 
   return (
     <>
@@ -18,11 +20,7 @@ export default function Servicos() {
         <LinkBotao to="/mais/servicos/novo">Novo serviço</LinkBotao>
       </div>
 
-      {aviso && (
-        <p role="status" className="mt-4 rounded-lg bg-marca-suave p-3">
-          {aviso}
-        </p>
-      )}
+      <Aviso texto={aviso} />
       {carregando && (
         <p role="status" className="mt-6 text-texto-suave">
           Carregando serviços…

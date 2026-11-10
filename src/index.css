@@ -1,13 +1,40 @@
 @import 'tailwindcss';
 
+/*
+ * Paleta do Espaço Juju (cartão de visita), ajustada para WCAG AA.
+ * O rosa original do logo (#c9637b) tem só 3,6:1 sobre o fundo: fica para
+ * decoração e bordas. Texto e botões usam `marca`, o mesmo tom escurecido.
+ * Os contrastes mínimos são conferidos em `src/tema.test.ts`: ao trocar uma
+ * cor aqui, rode `pnpm test`.
+ */
 @theme {
-  --color-marca: #c2185b;
+  /* marca */
+  --color-marca: #a8445e; /* texto, links, botão com texto branco (5,5:1) */
+  --color-marca-escura: #7d2e44; /* hover/pressionado */
+  --color-marca-decorativa: #c9637b; /* rosa do logo: só enfeite, nunca texto */
+  --color-marca-suave: #f8e4e9; /* fundo de destaque (aba ativa, selecionado) */
+
+  /* superfícies e texto */
+  --color-fundo: #fef9f6; /* creme do cartão */
+  --color-superficie: #ffffff; /* cartões, barra inferior, campos */
+  --color-texto: #2e2629;
+  --color-texto-suave: #6b4f57; /* texto secundário (7:1) */
+  --color-borda: #ecd9de; /* divisórias decorativas */
+  --color-borda-campo: #9b7f87; /* contorno de campo: 3:1 exigido p/ componentes */
+  --color-erro: #b3261e;
+
+  /* estados da agenda (sempre acompanhados de texto, nunca só a cor) */
   --color-marcado: #1565c0;
   --color-livre: #2e7d32;
-  --color-bloqueado: #616161;
-  --color-pendente: #f9a825;
+  --color-bloqueado: #6e6266;
+  --color-pendente: #f9a825; /* fundo, com texto na cor `texto` */
 }
 
 html {
   font-size: 16px;
+}
+
+body {
+  background-color: var(--color-fundo);
+  color: var(--color-texto);
 }

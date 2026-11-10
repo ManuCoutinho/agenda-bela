@@ -11,7 +11,7 @@ export default function BarraInferior() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 border-t border-borda bg-superficie pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto grid max-w-md grid-cols-4">
         {ABAS.map((aba) => (
@@ -21,7 +21,7 @@ export default function BarraInferior() {
               end
               className={({ isActive }) =>
                 `flex min-h-14 items-center justify-center text-base ${
-                  isActive ? 'font-semibold text-marca' : 'text-gray-700'
+                  isActive ? 'bg-marca-suave font-semibold text-marca' : 'text-texto-suave'
                 }`
               }
             >

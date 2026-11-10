@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agruparPorDia,
   dataDoDia,
+  diaDaSemana,
   diasAPartirDe,
   horaDe,
   horariosParaMarcar,
@@ -56,7 +57,7 @@ describe('travaLivre', () => {
 
 describe('horariosParaMarcar', () => {
   it('marca como ocupado o início que invadiria uma trava', () => {
-    const opcoes = horariosParaMarcar(new Set(['1000']), 60, 0);
+    const opcoes = horariosParaMarcar(new Set(['1000']), 60, 0, []);
     const porHora = Object.fromEntries(opcoes.map((o) => [o.hora, o.livre]));
     expect(porHora['0900']).toBe(true);
     expect(porHora['0930']).toBe(false); // 09:30–10:30 pega o bloco das 10h
@@ -64,10 +65,38 @@ describe('horariosParaMarcar', () => {
     expect(porHora['1030']).toBe(true);
   });
 
+  it('o intervalo depois do atendimento também precisa estar livre', () => {
+    const opcoes = horariosParaMarcar(new Set(['1000']), 60, 30, []);
+    const porHora = Object.fromEntries(opcoes.map((o) => [o.hora, o.livre]));
+    expect(porHora['0830']).toBe(true); // 08:30–09:30 + intervalo até 10:00
+    expect(porHora['0900']).toBe(false); // o intervalo cairia no bloco das 10h
+  });
+
   it('vai das 6h até o último início que termina às 22h', () => {
-    const opcoes = horariosParaMarcar(new Set(), 90, 0);
+    const opcoes = horariosParaMarcar(new Set(), 90, 0, []);
     expect(opcoes[0]?.hora).toBe('0600');
     expect(opcoes.at(-1)?.hora).toBe('2030');
+  });
+
+  it('sinaliza o que fica fora do expediente e amplia a faixa se ele for maior', () => {
+    const opcoes = horariosParaMarcar(new Set(), 60, 0, [{ ini: '05:00', fim: '12:00' }]);
+    const noExpediente = Object.fromEntries(opcoes.map((o) => [o.hora, o.noExpediente]));
+    expect(opcoes[0]?.hora).toBe('0500');
+    expect(noExpediente['1100']).toBe(true); // 11h–12h cabe
+    expect(noExpediente['1130']).toBe(false); // passaria das 12h
+    expect(noExpediente['1400']).toBe(false);
+  });
+
+  it('sem expediente no dia, tudo é encaixe', () => {
+    const opcoes = horariosParaMarcar(new Set(), 60, 0, []);
+    expect(opcoes.every((o) => !o.noExpediente)).toBe(true);
+  });
+});
+
+describe('diaDaSemana', () => {
+  it('usa o dia em São Paulo', () => {
+    expect(diaDaSemana('2026-12-01')).toBe(2); // terça
+    expect(diaDaSemana('2026-12-06')).toBe(0); // domingo
   });
 });
 

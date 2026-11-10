@@ -3,13 +3,14 @@ import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import {
   esquemaAtendimento,
+  diaDaSemana,
   horariosParaMarcar,
-  INTERVALO_PADRAO_MIN,
   rotuloHora,
   type CamposAtendimento,
   type DadosAtendimento,
 } from '../dominio/agenda';
 import type { Cliente } from '../dominio/clientes';
+import { expedienteDoDia, type FaixaExpediente } from '../dominio/configuracoes';
 import { formatarDuracao, type Servico } from '../dominio/servicos';
 import Botao from './Botao';
 import Campo from './Campo';
@@ -21,6 +22,9 @@ type Props = {
   inicial: CamposAtendimento;
   /** Horas (HHmm) ocupadas no dia escolhido, sem as do próprio atendimento. */
   ocupados: ReadonlySet<string>;
+  intervaloMin: number;
+  /** Expediente da semana; horários fora dele aparecem sinalizados. */
+  expediente: readonly FaixaExpediente[];
   aoMudarData: (data: string) => void;
   aoEnviar: (dados: DadosAtendimento) => Promise<void>;
   aoCancelar: () => void;
@@ -28,8 +32,8 @@ type Props = {
 };
 
 export default function FormularioAtendimento(props: Props) {
-  const { clientes, servicos, inicial, ocupados, aoMudarData, aoEnviar, aoCancelar, erroEnvio } =
-    props;
+  const { clientes, servicos, inicial, ocupados, intervaloMin, expediente } = props;
+  const { aoMudarData, aoEnviar, aoCancelar, erroEnvio } = props;
   const {
     register,
     handleSubmit,
@@ -44,7 +48,9 @@ export default function FormularioAtendimento(props: Props) {
   useEffect(() => aoMudarData(data), [data, aoMudarData]);
 
   const duracao = servicos.find((s) => s.id === servicoId)?.duracaoMin ?? 30;
-  const horarios = horariosParaMarcar(ocupados, duracao, INTERVALO_PADRAO_MIN);
+  const dataValida = /^\d{4}-\d{2}-\d{2}$/.test(data);
+  const doDia = dataValida ? expedienteDoDia(expediente, diaDaSemana(data)) : [];
+  const horarios = horariosParaMarcar(ocupados, duracao, intervaloMin, doDia);
 
   return (
     <form noValidate onSubmit={handleSubmit(aoEnviar)} className="flex flex-col gap-5">
@@ -81,7 +87,7 @@ export default function FormularioAtendimento(props: Props) {
       <Campo
         id="hora"
         rotulo="Horário de início"
-        dica="Horários ocupados aparecem desativados."
+        dica="Horários ocupados aparecem desativados. Fora do expediente dá para marcar encaixe."
         erro={errors.hora?.message}
       >
         {(a) => (
@@ -90,7 +96,7 @@ export default function FormularioAtendimento(props: Props) {
             {horarios.map((h) => (
               <option key={h.hora} value={h.hora} disabled={!h.livre}>
                 {rotuloHora(h.hora)}
-                {h.livre ? '' : ' (ocupado)'}
+                {!h.livre ? ' (ocupado)' : h.noExpediente ? '' : ' (fora do expediente)'}
               </option>
             ))}
           </select>

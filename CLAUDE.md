@@ -2,7 +2,7 @@
 
 PWA de agenda para uma manicure: área dela (login Google) e página pública `/agendar/:slug` onde clientes pedem horário. Sem servidor próprio: Firebase (Auth, Firestore, Hosting) no plano Spark, sem Cloud Functions.
 
-- Plano, status e próximos passos: `docs/plano-execucao.md` (fora do Git). Leia a seção "Estado atual e próxima sessão" antes de começar.
+- Plano, status e próximos passos: `docs/plano-execucao.md` (fora do Git). Fluxo kanban: leia a seção "Quadro (kanban)" antes de começar e siga a ordem de "A fazer".
 - Requisitos (RF/RNF/RN/HU), modelo de dados e decisões: _Guia técnico – Agenda Bela_ (documento externo; o plano resume).
 
 ## Comandos
@@ -28,7 +28,7 @@ firebase deploy --only firestore   # regras: deploy manual, nunca pelo CI
 
 - Commits assinados só pela usuária (identidade do `git config`): sem `Co-Authored-By` nem outra menção ao Claude em commits e PRs.
 - Não usar `gh`. Git só pela CLI padrão; PR e merge pelo site do GitHub.
-- O shell do Claude não tem credencial do GitHub: faça commits locais e peça à usuária para dar push.
+- Push por SSH (o  tem pushurl ); o Claude envia a branch e entrega título/descrição do PR para a usuária abrir no site.
 - `main` protegida: branch por história (`feat/rf02-clientes`), Conventional Commits citando o requisito (`feat(RF02): …`), PR com o check `verificar`.
 - CI (`.github/workflows/ci.yml`): `verificar` (lint → test → test:regras → build) → `previa` em PR / `producao` na `main`.
 

@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router';
 import Clientes from './paginas/manicure/Clientes';
+import Configuracoes from './paginas/manicure/Configuracoes';
 import EditarAtendimento from './paginas/manicure/EditarAtendimento';
 import EditarCliente from './paginas/manicure/EditarCliente';
 import EditarServico from './paginas/manicure/EditarServico';
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="clientes/nova" element={<EditarCliente />} />
         <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
+        <Route path="mais/configuracoes" element={<Configuracoes />} />
         <Route path="mais/servicos" element={<Servicos />} />
         <Route path="mais/servicos/novo" element={<EditarServico />} />
         <Route path="mais/servicos/:id" element={<EditarServico />} />

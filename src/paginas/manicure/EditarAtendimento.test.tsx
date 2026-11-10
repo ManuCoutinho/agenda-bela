@@ -4,13 +4,16 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HorarioOcupado, inicioEm, type Agendamento } from '../../dominio/agenda';
 import { useAgendamento, useOcupados } from '../../hooks/useAgenda';
+import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { useClientes } from '../../hooks/useClientes';
+import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
 import EditarAtendimento from './EditarAtendimento';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
+vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamento: vi.fn(), useOcupados: vi.fn() }));
 vi.mock('../../servicos/agenda', () => ({
   marcarAtendimento: vi.fn(),
@@ -65,6 +68,11 @@ describe('EditarAtendimento (RF07)', () => {
     vi.mocked(cancelarAtendimento).mockReset();
     vi.mocked(useClientes).mockReturnValue({ clientes: [ANA], carregando: false, erro: false });
     vi.mocked(useServicos).mockReturnValue({ servicos: [MAO], carregando: false, erro: false });
+    vi.mocked(useConfiguracoes).mockReturnValue({
+      config: CONFIGURACOES_PADRAO, // terça, 09h–18h, sem intervalo
+      carregando: false,
+      erro: false,
+    });
     vi.mocked(useAgendamento).mockReturnValue({ dados: null, carregando: false, erro: false });
     vi.mocked(useOcupados).mockReturnValue({
       dados: new Set(['1000', '1030']),
@@ -81,6 +89,7 @@ describe('EditarAtendimento (RF07)', () => {
 
     expect(opcao('09:30 (ocupado)').disabled).toBe(true); // 09:30–10:30 invade as 10h
     expect(opcao('11:00').disabled).toBe(false);
+    expect(opcao('08:00 (fora do expediente)').disabled).toBe(false); // encaixe permitido
 
     await userEvent.selectOptions(screen.getByLabelText('Horário de início'), '09:00');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar atendimento' }));

@@ -9,13 +9,13 @@ import {
   HorarioOcupado,
   idsTravas,
   inicioEm,
-  INTERVALO_PADRAO_MIN,
   rotuloDia,
   rotuloHora,
   type DadosAtendimento,
 } from '../../dominio/agenda';
 import { useAgendamento, useOcupados } from '../../hooks/useAgenda';
 import { useClientes } from '../../hooks/useClientes';
+import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
 
@@ -31,6 +31,8 @@ export default function EditarAtendimento() {
   const navegar = useNavigate();
   const clientes = useClientes();
   const servicos = useServicos();
+  const configuracoes = useConfiguracoes();
+  const { config } = configuracoes;
   const atendimento = useAgendamento(id);
   const atual = atendimento.dados;
 
@@ -70,7 +72,7 @@ export default function EditarAtendimento() {
           servicoNome: servico.nome,
           duracaoMin: servico.duracaoMin,
           inicio,
-          travas: idsTravas(inicio, servico.duracaoMin, INTERVALO_PADRAO_MIN),
+          travas: idsTravas(inicio, servico.duracaoMin, config.intervaloMin),
           status: 'marcado',
           observacao: d.observacao,
         },
@@ -101,8 +103,12 @@ export default function EditarAtendimento() {
   }
 
   const titulo = id ? 'Atendimento' : 'Novo atendimento';
-  const carregando = clientes.carregando || servicos.carregando || atendimento.carregando;
-  const erro = clientes.erro || servicos.erro || atendimento.erro;
+  const carregando =
+    clientes.carregando ||
+    servicos.carregando ||
+    configuracoes.carregando ||
+    atendimento.carregando;
+  const erro = clientes.erro || servicos.erro || configuracoes.erro || atendimento.erro;
 
   if (carregando) {
     return (
@@ -181,6 +187,8 @@ export default function EditarAtendimento() {
           observacao: atual?.observacao ?? '',
         }}
         ocupados={ocupados}
+        intervaloMin={config.intervaloMin}
+        expediente={config.expediente}
         aoMudarData={aoMudarData}
         aoEnviar={salvar}
         aoCancelar={() => navegar(-1)}

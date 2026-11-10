@@ -6,9 +6,11 @@ import {
 } from '@firebase/rules-unit-testing';
 import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-const MANICURE = 'UID_DA_MANICURE';
+const REGRAS = readFileSync('firestore.rules', 'utf8');
+/** O UID vem das próprias regras: trocar o UID na entrega não exige mudar os testes. */
+const MANICURE = /function uidDaManicure\(\) \{\s*return '([^']+)';/.exec(REGRAS)?.[1] ?? '';
 const HORA = 3_600_000;
 
 let env: RulesTestEnvironment;
@@ -16,7 +18,7 @@ let env: RulesTestEnvironment;
 beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-agenda-bela',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8') },
+    firestore: { rules: REGRAS },
   });
 });
 
@@ -64,6 +66,11 @@ describe('dados privados (RNF07)', () => {
     await assertFails(db.doc('agendamentos/a1').get());
     await assertFails(db.doc('bloqueios/b1').get());
     await assertFails(db.doc('pedidos/p1').get());
+  });
+
+  it('regras têm um UID real, não o texto provisório', () => {
+    expect(MANICURE).toMatch(/^[A-Za-z0-9]{20,128}$/);
+    expect(MANICURE).not.toBe('UID_DA_MANICURE');
   });
 
   it('outra conta Google também não lê clientes', async () => {

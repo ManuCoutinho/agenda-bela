@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router';
 import Clientes from './paginas/manicure/Clientes';
+import EditarCliente from './paginas/manicure/EditarCliente';
 import Entrar from './paginas/manicure/Entrar';
 import Hoje from './paginas/manicure/Hoje';
 import LayoutManicure from './paginas/manicure/LayoutManicure';
@@ -16,6 +17,8 @@ export default function App() {
         <Route index element={<Hoje />} />
         <Route path="semana" element={<Semana />} />
         <Route path="clientes" element={<Clientes />} />
+        <Route path="clientes/nova" element={<EditarCliente />} />
+        <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
       </Route>
     </Routes>

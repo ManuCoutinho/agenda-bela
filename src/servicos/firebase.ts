@@ -25,3 +25,12 @@ if (import.meta.env.VITE_USAR_EMULADOR === 'true') {
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, 'localhost', 8080);
 }
+
+/**
+ * Offline (RNF06): o Firestore aplica a gravação no cache local na hora e só
+ * resolve a promessa quando o servidor confirma. As telas não esperam: seguem
+ * em frente e a gravação sincroniza quando houver internet.
+ */
+export function gravarEmSegundoPlano(gravacao: Promise<unknown>) {
+  gravacao.catch((erro: unknown) => console.error('Falha ao sincronizar gravação', erro));
+}

@@ -18,7 +18,7 @@ export default function BarraInferior() {
           <li key={aba.para}>
             <NavLink
               to={aba.para}
-              end
+              end={aba.para === '/'}
               className={({ isActive }) =>
                 `flex min-h-14 items-center justify-center text-base ${
                   isActive ? 'bg-marca-suave font-semibold text-marca' : 'text-texto-suave'

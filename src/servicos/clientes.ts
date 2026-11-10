@@ -5,6 +5,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   type DocumentData,
 } from 'firebase/firestore';
 import type { Cliente, DadosCliente } from '../dominio/clientes';
@@ -45,4 +46,23 @@ export function salvarCliente(dados: DadosCliente, id?: string): string {
     setDoc(ref, { ...dados, criadoEm: serverTimestamp(), atualizadoEm: serverTimestamp() }),
   );
   return ref.id;
+}
+
+/** O Firestore aceita até 500 gravações por lote. */
+const POR_LOTE = 400;
+
+/** Grava várias clientes de uma vez (importação), sem esperar o servidor. */
+export function importarClientes(lista: readonly DadosCliente[]) {
+  for (let i = 0; i < lista.length; i += POR_LOTE) {
+    const lote = writeBatch(db);
+    for (const dados of lista.slice(i, i + POR_LOTE)) {
+      lote.set(doc(colecao), {
+        ...dados,
+        importada: true,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp(),
+      });
+    }
+    gravarEmSegundoPlano(lote.commit());
+  }
 }

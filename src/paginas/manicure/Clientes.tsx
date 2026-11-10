@@ -5,6 +5,7 @@ import BarraSuperior from '../../componentes/BarraSuperior';
 import Campo from '../../componentes/Campo';
 import Fab from '../../componentes/Fab';
 import Icone from '../../componentes/Icone';
+import LinkBotao from '../../componentes/LinkBotao';
 import {
   ESTILO_BOTAO_ICONE,
   ESTILO_CAMPO,
@@ -26,6 +27,9 @@ export default function Clientes() {
   return (
     <>
       <BarraSuperior titulo="Clientes" />
+      <LinkBotao to="/clientes/importar" variante="secundario" className="mb-4 w-full">
+        Importar dos contatos
+      </LinkBotao>
 
       {carregando && (
         <p role="status" className="text-texto-suave">
@@ -40,7 +44,7 @@ export default function Clientes() {
 
       {!carregando && !erro && clientes.length === 0 && (
         <p className="text-texto-suave">
-          Nenhuma cliente cadastrada ainda. Toque em “Nova cliente” para começar.
+          Nenhuma cliente cadastrada ainda. Importe dos contatos ou toque em “Nova cliente”.
         </p>
       )}
 

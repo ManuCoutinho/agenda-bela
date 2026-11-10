@@ -6,6 +6,7 @@ import EditarCliente from './paginas/manicure/EditarCliente';
 import EditarServico from './paginas/manicure/EditarServico';
 import Entrar from './paginas/manicure/Entrar';
 import Hoje from './paginas/manicure/Hoje';
+import ImportarClientes from './paginas/manicure/ImportarClientes';
 import LayoutManicure from './paginas/manicure/LayoutManicure';
 import Mais from './paginas/manicure/Mais';
 import Semana from './paginas/manicure/Semana';
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="atendimentos/:id" element={<EditarAtendimento />} />
         <Route path="clientes" element={<Clientes />} />
         <Route path="clientes/nova" element={<EditarCliente />} />
+        <Route path="clientes/importar" element={<ImportarClientes />} />
         <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
         <Route path="mais/configuracoes" element={<Configuracoes />} />

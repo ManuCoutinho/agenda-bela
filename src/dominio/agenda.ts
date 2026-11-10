@@ -2,14 +2,14 @@ import { TZDate } from '@date-fns/tz';
 import { addDays, addMinutes, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
-import { blocosNecessarios, hhmm, PASSO } from './disponibilidade';
+import { blocosNecessarios, hhmm, PASSO, type Faixa } from './disponibilidade';
 
 export const FUSO = 'America/Sao_Paulo';
 
-/** Até a C9 (configurações), o intervalo entre atendimentos é fixo. */
-export const INTERVALO_PADRAO_MIN = 0;
-
-/** Faixa de horários oferecida à manicure ao marcar (o expediente vem na C9). */
+/**
+ * Faixa mínima oferecida à manicure ao marcar. Ela pode marcar fora do
+ * expediente (encaixe); esses horários vêm sinalizados.
+ */
 export const FAIXA_MARCACAO = { ini: 6 * 60, fim: 22 * 60 };
 
 export type StatusAgendamento = 'marcado' | 'cancelado';
@@ -89,26 +89,38 @@ export function idsTravas(inicio: Date, duracaoMin: number, intervaloMin: number
 export const travaLivre = (expiraEm: Date | null | undefined, agora: Date) =>
   expiraEm !== null && (expiraEm === undefined || expiraEm <= agora);
 
-export type OpcaoHorario = { hora: string; livre: boolean };
+/** Dia da semana (0 = domingo) da data AAAA-MM-DD em São Paulo. */
+export const diaDaSemana = (data: string) => noFuso(inicioEm(data, '1200')).getDay();
+
+export type OpcaoHorario = { hora: string; livre: boolean; noExpediente: boolean };
+
+/** '09:30' → 570 */
+const emMinutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3));
 
 /**
  * Horários de início para a manicure marcar no dia, de 30 em 30 min.
  * `ocupados` são as horas (HHmm) com trava ativa nesse dia, sem as do próprio
- * atendimento quando ele está sendo editado.
+ * atendimento quando ele está sendo editado. `expediente` são as faixas de
+ * trabalho desse dia; fora delas o horário é oferecido, mas sinalizado.
  */
 export function horariosParaMarcar(
   ocupados: ReadonlySet<string>,
   duracaoMin: number,
   intervaloMin: number,
+  expediente: readonly Faixa[],
 ): OpcaoHorario[] {
+  const faixas = expediente.map((f) => ({ ini: emMinutos(f.ini), fim: emMinutos(f.fim) }));
+  const primeiro = Math.min(FAIXA_MARCACAO.ini, ...faixas.map((f) => f.ini));
+  const ultimo = Math.max(FAIXA_MARCACAO.fim, ...faixas.map((f) => f.fim));
   const total = blocosNecessarios(duracaoMin, intervaloMin);
   const opcoes: OpcaoHorario[] = [];
-  for (let ini = FAIXA_MARCACAO.ini; ini + duracaoMin <= FAIXA_MARCACAO.fim; ini += PASSO) {
+  for (let ini = primeiro; ini + duracaoMin <= ultimo; ini += PASSO) {
     let livre = true;
     for (let t = ini; t < ini + total; t += PASSO) {
       if (ocupados.has(hhmm(t))) livre = false;
     }
-    opcoes.push({ hora: hhmm(ini), livre });
+    const noExpediente = faixas.some((f) => ini >= f.ini && ini + duracaoMin <= f.fim);
+    opcoes.push({ hora: hhmm(ini), livre, noExpediente });
   }
   return opcoes;
 }

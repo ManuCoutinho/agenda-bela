@@ -1,9 +1,16 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import Aviso from '../../componentes/Aviso';
+import BarraSuperior from '../../componentes/BarraSuperior';
 import Campo from '../../componentes/Campo';
-import LinkBotao from '../../componentes/LinkBotao';
-import { ESTILO_CAMPO, ESTILO_LINK } from '../../componentes/estilos';
+import Fab from '../../componentes/Fab';
+import Icone from '../../componentes/Icone';
+import {
+  ESTILO_BOTAO_ICONE,
+  ESTILO_CAMPO,
+  ESTILO_ITEM_LISTA,
+  ESTILO_LISTA,
+} from '../../componentes/estilos';
 import { buscarClientes, formatarWhatsApp } from '../../dominio/clientes';
 import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useAviso } from '../../hooks/useAviso';
@@ -18,76 +25,70 @@ export default function Clientes() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Clientes</h1>
-        <LinkBotao to="/clientes/nova">Nova cliente</LinkBotao>
-      </div>
-
-      <Aviso texto={aviso} />
+      <BarraSuperior titulo="Clientes" />
 
       {carregando && (
-        <p role="status" className="mt-6 text-texto-suave">
+        <p role="status" className="text-texto-suave">
           Carregando clientes…
         </p>
       )}
       {erro && (
-        <p role="alert" className="mt-6 text-erro">
+        <p role="alert" className="text-erro">
           Não foi possível carregar as clientes. Confira a internet e tente de novo.
         </p>
       )}
 
       {!carregando && !erro && clientes.length === 0 && (
-        <p className="mt-6 text-texto-suave">
+        <p className="text-texto-suave">
           Nenhuma cliente cadastrada ainda. Toque em “Nova cliente” para começar.
         </p>
       )}
 
       {clientes.length > 0 && (
         <>
-          <div className="mt-6">
-            <Campo id={idBusca} rotulo="Buscar por nome ou WhatsApp">
-              {(a) => (
-                <input
-                  {...a}
-                  type="search"
-                  value={termo}
-                  onChange={(e) => setTermo(e.target.value)}
-                  className={ESTILO_CAMPO}
-                />
-              )}
-            </Campo>
-          </div>
+          <Campo id={idBusca} rotulo="Buscar por nome ou WhatsApp">
+            {(a) => (
+              <input
+                {...a}
+                type="search"
+                value={termo}
+                onChange={(e) => setTermo(e.target.value)}
+                className={ESTILO_CAMPO}
+              />
+            )}
+          </Campo>
 
-          <p aria-live="polite" className="mt-3 text-texto-suave">
+          <p aria-live="polite" className="mt-4 mb-2 text-texto-suave">
             {encontradas.length === 0
               ? `Nenhuma cliente encontrada para “${termo.trim()}”.`
               : `${encontradas.length} ${encontradas.length === 1 ? 'cliente' : 'clientes'}`}
           </p>
 
-          <ul className="mt-2 divide-y divide-borda rounded-lg border border-borda bg-superficie">
+          <ul className={ESTILO_LISTA}>
             {encontradas.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-x-4 p-3">
-                <Link
-                  to={`/clientes/${c.id}`}
-                  className={`flex min-h-11 flex-col justify-center ${ESTILO_LINK} no-underline`}
-                >
-                  <span className="font-medium">{c.nome}</span>
-                  <span className="text-texto-suave">{formatarWhatsApp(c.whatsapp)}</span>
+              <li key={c.id} className="flex items-center pr-2">
+                <Link to={`/clientes/${c.id}`} className={`${ESTILO_ITEM_LISTA} min-h-18 flex-1`}>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{c.nome}</span>
+                    <span className="text-texto-suave">{formatarWhatsApp(c.whatsapp)}</span>
+                  </span>
                 </Link>
                 <a
                   href={linkWhatsApp(c.whatsapp, `Oi, ${c.nome}!`)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`Conversar com ${c.nome} no WhatsApp (abre outro app)`}
-                  className={`inline-flex min-h-11 items-center ${ESTILO_LINK}`}
+                  className={`${ESTILO_BOTAO_ICONE} text-marca`}
                 >
-                  WhatsApp
+                  <Icone nome="conversa" />
                 </a>
               </li>
             ))}
           </ul>
         </>
       )}
+      <Fab to="/clientes/nova" rotulo="Nova cliente" />
+      <Aviso texto={aviso} />
     </>
   );
 }

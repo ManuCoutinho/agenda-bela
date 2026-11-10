@@ -1,6 +1,6 @@
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
+import BarraSuperior from '../../componentes/BarraSuperior';
 import FormularioConfiguracoes from '../../componentes/FormularioConfiguracoes';
-import { ESTILO_LINK } from '../../componentes/estilos';
 import {
   paraCampos,
   paraConfiguracoes,
@@ -21,10 +21,7 @@ export default function Configuracoes() {
 
   return (
     <>
-      <Link to="/mais" className={`inline-flex min-h-11 items-center ${ESTILO_LINK}`}>
-        Voltar
-      </Link>
-      <h1 className="mt-2 mb-6 text-2xl font-semibold">Configurações</h1>
+      <BarraSuperior titulo="Configurações" voltarPara="/mais" />
       {carregando ? (
         <p role="status" className="text-texto-suave">
           Carregando configurações…

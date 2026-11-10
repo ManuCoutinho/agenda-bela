@@ -1,5 +1,6 @@
 import Aviso from '../../componentes/Aviso';
-import LinkBotao from '../../componentes/LinkBotao';
+import BarraSuperior from '../../componentes/BarraSuperior';
+import Fab from '../../componentes/Fab';
 import ListaDoDia from '../../componentes/ListaDoDia';
 import { agruparPorDia, dataDoDia, rotuloDia } from '../../dominio/agenda';
 import { useAgendamentos } from '../../hooks/useAgenda';
@@ -12,30 +13,24 @@ export default function Hoje() {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Hoje</h1>
-          <p className="text-texto-suave first-letter:uppercase">{rotuloDia(hoje)}</p>
-        </div>
-        <LinkBotao to={`/atendimentos/novo?data=${hoje}`}>Novo atendimento</LinkBotao>
-      </div>
+      <BarraSuperior titulo="Hoje" />
+      <p className="mb-4 text-texto-suave first-letter:uppercase">{rotuloDia(hoje)}</p>
+      {carregando ? (
+        <p role="status" className="text-texto-suave">
+          Carregando agenda…
+        </p>
+      ) : erro ? (
+        <p role="alert" className="text-erro">
+          Não foi possível carregar a agenda. Confira a internet e tente de novo.
+        </p>
+      ) : (
+        <ListaDoDia
+          agendamentos={agruparPorDia(dados).get(hoje) ?? []}
+          vazio="Nenhum atendimento marcado para hoje."
+        />
+      )}
+      <Fab to={`/atendimentos/novo?data=${hoje}`} rotulo="Novo atendimento" />
       <Aviso texto={aviso} />
-      <div className="mt-6">
-        {carregando ? (
-          <p role="status" className="text-texto-suave">
-            Carregando agenda…
-          </p>
-        ) : erro ? (
-          <p role="alert" className="text-erro">
-            Não foi possível carregar a agenda. Confira a internet e tente de novo.
-          </p>
-        ) : (
-          <ListaDoDia
-            agendamentos={agruparPorDia(dados).get(hoje) ?? []}
-            vazio="Nenhum atendimento marcado para hoje."
-          />
-        )}
-      </div>
     </>
   );
 }

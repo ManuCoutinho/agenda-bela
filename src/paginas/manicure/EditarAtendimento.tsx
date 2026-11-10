@@ -1,3 +1,4 @@
+import BarraSuperior from '../../componentes/BarraSuperior';
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import Botao from '../../componentes/Botao';
@@ -120,11 +121,11 @@ export default function EditarAtendimento() {
   if (erro || (id && !atual)) {
     return (
       <>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
+        <BarraSuperior titulo={titulo} voltarPara="/" />
         <p role="alert" className="mt-4">
           {erro ? ERRO_CARREGAR : 'Não encontramos esse atendimento. Volte para a agenda.'}
         </p>
-        <Link to="/" className={`mt-4 inline-flex min-h-11 items-center ${ESTILO_LINK}`}>
+        <Link to="/" className={`mt-4 inline-flex min-h-12 items-center ${ESTILO_LINK}`}>
           Voltar para hoje
         </Link>
       </>
@@ -133,7 +134,7 @@ export default function EditarAtendimento() {
   if (atual?.status === 'cancelado') {
     return (
       <>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
+        <BarraSuperior titulo={titulo} voltarPara="/" />
         <p className="mt-4">
           O atendimento de {atual.clienteNome} em {rotuloDia(dataDoDia(atual.inicio))} foi
           cancelado.
@@ -144,14 +145,14 @@ export default function EditarAtendimento() {
   if (clientes.clientes.length === 0 || servicos.servicos.length === 0) {
     return (
       <>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
+        <BarraSuperior titulo={titulo} voltarPara="/" />
         <p className="mt-4">Para marcar, cadastre antes:</p>
         <ul className="mt-2 flex flex-col">
           {clientes.clientes.length === 0 && (
             <li>
               <Link
                 to="/clientes/nova"
-                className={`inline-flex min-h-11 items-center ${ESTILO_LINK}`}
+                className={`inline-flex min-h-12 items-center ${ESTILO_LINK}`}
               >
                 uma cliente
               </Link>
@@ -161,7 +162,7 @@ export default function EditarAtendimento() {
             <li>
               <Link
                 to="/mais/servicos/novo"
-                className={`inline-flex min-h-11 items-center ${ESTILO_LINK}`}
+                className={`inline-flex min-h-12 items-center ${ESTILO_LINK}`}
               >
                 um serviço
               </Link>
@@ -174,7 +175,7 @@ export default function EditarAtendimento() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold">{titulo}</h1>
+      <BarraSuperior titulo={titulo} voltarPara="/" />
       <FormularioAtendimento
         key={atual?.id ?? 'novo'}
         clientes={clientes.clientes}
@@ -197,7 +198,7 @@ export default function EditarAtendimento() {
 
       {atual && (
         <section aria-labelledby="cancelar" className="mt-10 border-t border-borda pt-6">
-          <h2 id="cancelar" className="text-lg font-semibold">
+          <h2 id="cancelar" className="text-secao font-medium">
             Cancelar atendimento
           </h2>
           {confirmandoCancelamento ? (

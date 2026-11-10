@@ -1,7 +1,9 @@
 import { Link, useSearchParams } from 'react-router';
 import Aviso from '../../componentes/Aviso';
+import BarraSuperior from '../../componentes/BarraSuperior';
+import Icone from '../../componentes/Icone';
 import ListaDoDia from '../../componentes/ListaDoDia';
-import { ESTILO_BOTAO, ESTILO_LINK } from '../../componentes/estilos';
+import { ESTILO_BOTAO, ESTILO_BOTAO_ICONE } from '../../componentes/estilos';
 import {
   agruparPorDia,
   dataDoDia,
@@ -26,30 +28,39 @@ export default function Semana() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Semana</h1>
-      <Aviso texto={aviso} />
+      <BarraSuperior titulo="Semana" />
 
-      <nav aria-label="Trocar semana" className="mt-4 flex flex-wrap gap-2">
-        <Link to={`/semana?de=${somarDias(de, -DIAS)}`} className={ESTILO_BOTAO.secundario}>
-          7 dias antes
+      <nav aria-label="Trocar semana" className="flex items-center justify-between gap-2">
+        <Link
+          to={`/semana?de=${somarDias(de, -DIAS)}`}
+          aria-label="7 dias antes"
+          className={ESTILO_BOTAO_ICONE}
+        >
+          <Icone nome="anterior" />
         </Link>
-        {de !== hoje && (
-          <Link to="/semana" className={ESTILO_BOTAO.secundario}>
+        {de !== hoje ? (
+          <Link to="/semana" className={ESTILO_BOTAO.texto}>
             A partir de hoje
           </Link>
+        ) : (
+          <span className="text-texto-suave">Próximos 7 dias</span>
         )}
-        <Link to={`/semana?de=${somarDias(de, DIAS)}`} className={ESTILO_BOTAO.secundario}>
-          7 dias depois
+        <Link
+          to={`/semana?de=${somarDias(de, DIAS)}`}
+          aria-label="7 dias depois"
+          className={ESTILO_BOTAO_ICONE}
+        >
+          <Icone nome="proximo" />
         </Link>
       </nav>
 
       {carregando && (
-        <p role="status" className="mt-6 text-texto-suave">
+        <p role="status" className="mt-4 text-texto-suave">
           Carregando agenda…
         </p>
       )}
       {erro && (
-        <p role="alert" className="mt-6 text-erro">
+        <p role="alert" className="mt-4 text-erro">
           Não foi possível carregar a agenda. Confira a internet e tente de novo.
         </p>
       )}
@@ -59,13 +70,13 @@ export default function Semana() {
         diasAPartirDe(de, DIAS).map((dia) => (
           <section key={dia} aria-labelledby={`dia-${dia}`} className="mt-6">
             <div className="mb-2 flex items-center justify-between gap-4">
-              <h2 id={`dia-${dia}`} className="text-lg font-semibold first-letter:uppercase">
+              <h2 id={`dia-${dia}`} className="text-secao font-medium first-letter:uppercase">
                 {dia === hoje ? `Hoje, ${rotuloDia(dia)}` : rotuloDia(dia)}
               </h2>
               <Link
                 to={`/atendimentos/novo?data=${dia}`}
                 aria-label={`Marcar atendimento em ${rotuloDia(dia)}`}
-                className={`inline-flex min-h-11 items-center ${ESTILO_LINK}`}
+                className={ESTILO_BOTAO.texto}
               >
                 Marcar
               </Link>
@@ -73,6 +84,7 @@ export default function Semana() {
             <ListaDoDia agendamentos={porDia.get(dia) ?? []} vazio="Nenhum atendimento." />
           </section>
         ))}
+      <Aviso texto={aviso} />
     </>
   );
 }

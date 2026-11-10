@@ -23,8 +23,8 @@ type Props = {
   aoCancelar: () => void;
 };
 
-const ESTILO_GRUPO = 'flex flex-col gap-5 rounded-lg border border-borda bg-superficie p-4';
-const ESTILO_TITULO = 'text-lg font-semibold';
+const ESTILO_GRUPO = 'flex flex-col gap-5 rounded-xl border border-borda bg-superficie p-4';
+const ESTILO_TITULO = 'text-secao font-medium';
 
 export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar }: Props) {
   const {
@@ -117,7 +117,7 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
           return (
             <fieldset key={rotulo} className="flex flex-col gap-3 border-t border-borda pt-4">
               <legend className="sr-only">{rotulo}</legend>
-              <label htmlFor={`dia-${i}`} className="flex min-h-11 items-center gap-3">
+              <label htmlFor={`dia-${i}`} className="flex min-h-12 items-center gap-3">
                 <input
                   id={`dia-${i}`}
                   type="checkbox"

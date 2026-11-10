@@ -59,7 +59,7 @@ export default function FormularioServico({ inicial = VAZIO, aoEnviar, aoCancela
         )}
       </Campo>
 
-      <label htmlFor="publico" className="flex min-h-11 items-start gap-3">
+      <label htmlFor="publico" className="flex min-h-12 items-start gap-3">
         <input
           id="publico"
           type="checkbox"

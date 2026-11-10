@@ -14,9 +14,10 @@ export default function LayoutManicure() {
   }
   if (!usuario) return <Navigate to="/entrar" replace />;
 
+  // 16 dp nas laterais; embaixo, espaço para a barra (80 dp) e o FAB (56 + 16 dp)
   return (
     <>
-      <main className="mx-auto max-w-md p-4 pb-24">
+      <main className="mx-auto max-w-md px-4 pb-[calc(10rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
       <BarraInferior />

@@ -1,3 +1,4 @@
+import BarraSuperior from '../../componentes/BarraSuperior';
 import { Link, useNavigate, useParams } from 'react-router';
 import FormularioServico from '../../componentes/FormularioServico';
 import { ESTILO_LINK } from '../../componentes/estilos';
@@ -33,7 +34,7 @@ export default function EditarServico() {
   if (erro || (id && !servico)) {
     return (
       <>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
+        <BarraSuperior titulo={titulo} voltarPara="/mais/servicos" />
         <p role="alert" className="mt-4">
           {erro
             ? 'Não foi possível carregar os serviços. Confira a internet e tente de novo.'
@@ -41,7 +42,7 @@ export default function EditarServico() {
         </p>
         <Link
           to="/mais/servicos"
-          className={`mt-4 inline-flex min-h-11 items-center ${ESTILO_LINK}`}
+          className={`mt-4 inline-flex min-h-12 items-center ${ESTILO_LINK}`}
         >
           Voltar para serviços
         </Link>
@@ -51,7 +52,7 @@ export default function EditarServico() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold">{titulo}</h1>
+      <BarraSuperior titulo={titulo} voltarPara="/mais/servicos" />
       <FormularioServico
         key={servico?.id ?? 'novo'}
         inicial={

@@ -6,18 +6,31 @@
  * decoração e bordas. Texto e botões usam `marca`, o mesmo tom escurecido.
  * Os contrastes mínimos são conferidos em `src/tema.test.ts`: ao trocar uma
  * cor aqui, rode `pnpm test`.
+ *
+ * Medidas seguem o Material 3 (Android). No navegador do Android, 1 dp = 1 px
+ * CSS; o espaçamento do Tailwind (múltiplos de 4 px) já é a grade do Material.
  */
 @theme {
+  /* Roboto é a fonte do sistema no Android: nada a baixar */
+  --font-sans: Roboto, 'Noto Sans', system-ui, sans-serif;
+
+  /* escala tipográfica (Material 3), com o mínimo de 16 px do projeto */
+  --text-titulo: 1.375rem; /* title large: 22/28, barra superior */
+  --text-titulo--line-height: 1.75rem;
+  --text-secao: 1.125rem; /* title medium ampliado: cabeçalhos de seção */
+  --text-secao--line-height: 1.5rem;
+
   /* marca */
   --color-marca: #a8445e; /* texto, links, botão com texto branco (5,5:1) */
-  --color-marca-escura: #7d2e44; /* hover/pressionado */
+  --color-marca-escura: #7d2e44; /* pressionado; texto sobre marca-suave */
   --color-marca-decorativa: #c9637b; /* rosa do logo: só enfeite, nunca texto */
-  --color-marca-suave: #f8e4e9; /* fundo de destaque (aba ativa, selecionado) */
+  --color-marca-suave: #f8e4e9; /* indicador da aba ativa, FAB, selecionado */
 
   /* superfícies e texto */
-  --color-fundo: #fef9f6; /* creme do cartão */
-  --color-superficie: #ffffff; /* cartões, barra inferior, campos */
-  --color-texto: #2e2629;
+  --color-fundo: #fef9f6; /* creme do cartão; barra superior */
+  --color-superficie: #ffffff; /* cartões, listas, campos */
+  --color-container: #f6ebee; /* barra de navegação inferior (surface container) */
+  --color-texto: #2e2629; /* também fundo do snackbar (inverse surface) */
   --color-texto-suave: #6b4f57; /* texto secundário (7:1) */
   --color-borda: #ecd9de; /* divisórias decorativas */
   --color-borda-campo: #9b7f87; /* contorno de campo: 3:1 exigido p/ componentes */
@@ -32,9 +45,20 @@
 
 html {
   font-size: 16px;
+  -webkit-tap-highlight-color: transparent; /* o retorno de toque vem dos estados `active:` */
 }
 
 body {
   background-color: var(--color-fundo);
   color: var(--color-texto);
+  overscroll-behavior-y: none;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation; /* sem atraso de duplo toque */
 }

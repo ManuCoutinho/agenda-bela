@@ -38,7 +38,12 @@ const PARES: [string, string, number][] = [
   ['marca', 'superficie', TEXTO],
   ['marca', 'marca-suave', TEXTO],
   ['superficie', 'marca', TEXTO], // botão principal
-  ['superficie', 'marca-escura', TEXTO], // botão principal em hover
+  ['superficie', 'marca-escura', TEXTO], // botão principal pressionado
+  ['marca-escura', 'marca-suave', TEXTO], // FAB e ícone da aba ativa
+  ['superficie', 'texto', TEXTO], // snackbar
+  ['texto', 'container', TEXTO], // aba ativa na barra de navegação
+  ['texto-suave', 'container', TEXTO], // abas inativas
+  ['texto', 'marca-suave', TEXTO], // rótulo sobre o indicador (hover)
   ['erro', 'fundo', TEXTO],
   ['erro', 'superficie', TEXTO],
   ['marcado', 'fundo', TEXTO],

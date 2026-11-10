@@ -65,7 +65,7 @@ export default function FormularioCliente({ inicial = VAZIO, aoEnviar, aoCancela
       </Campo>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="consentimento" className="flex min-h-11 items-start gap-3">
+        <label htmlFor="consentimento" className="flex min-h-12 items-start gap-3">
           <input
             id="consentimento"
             type="checkbox"

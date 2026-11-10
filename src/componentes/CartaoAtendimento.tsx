@@ -1,19 +1,18 @@
 import { Link } from 'react-router';
 import { fimDe, horaDe, rotuloHora, type Agendamento } from '../dominio/agenda';
-import { ESTILO_LINK } from './estilos';
 
-/** Atendimento na lista do dia: horário, cliente e serviço; abre a edição. */
+/** Atendimento na lista do dia (card outlined, 12 dp): horário, cliente e serviço. */
 export default function CartaoAtendimento({ agendamento: a }: { agendamento: Agendamento }) {
   const horario = `${rotuloHora(horaDe(a.inicio))}–${rotuloHora(horaDe(fimDe(a)))}`;
   return (
     <Link
       to={`/atendimentos/${a.id}`}
-      className={`flex min-h-11 gap-3 rounded-lg border border-borda border-l-4 border-l-marcado bg-superficie p-3 ${ESTILO_LINK} no-underline`}
+      className="flex min-h-18 items-center gap-4 rounded-xl border border-borda border-l-4 border-l-marcado bg-superficie px-4 py-3 text-texto no-underline hover:bg-fundo active:bg-marca-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
     >
-      <span className="w-28 shrink-0 font-semibold tabular-nums text-texto">{horario}</span>
-      <span className="flex flex-col">
-        <span className="font-medium">{a.clienteNome}</span>
-        <span className="text-texto-suave">{a.servicoNome}</span>
+      <span className="w-28 shrink-0 font-medium tabular-nums">{horario}</span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium">{a.clienteNome}</span>
+        <span className="truncate text-texto-suave">{a.servicoNome}</span>
       </span>
     </Link>
   );

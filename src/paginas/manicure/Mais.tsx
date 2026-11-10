@@ -1,7 +1,9 @@
 import { Link } from 'react-router';
 import Aviso from '../../componentes/Aviso';
+import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
-import { ESTILO_LINK } from '../../componentes/estilos';
+import Icone from '../../componentes/Icone';
+import { ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
 import { useAuth } from '../../hooks/useAuth';
 import { useAviso } from '../../hooks/useAviso';
 import { sair } from '../../servicos/autenticacao';
@@ -20,14 +22,16 @@ export default function Mais() {
   const aviso = useAviso();
   return (
     <>
-      <h1 className="text-2xl font-semibold">Mais</h1>
-      <Aviso texto={aviso} />
-      <ul className="mt-4 divide-y divide-borda rounded-lg border border-borda bg-superficie">
+      <BarraSuperior titulo="Mais" />
+      <ul className={ESTILO_LISTA}>
         {OPCOES.map((o) => (
           <li key={o.para}>
-            <Link to={o.para} className={`flex min-h-11 flex-col p-3 ${ESTILO_LINK} no-underline`}>
-              <span className="font-medium">{o.rotulo}</span>
-              <span className="text-texto-suave">{o.descricao}</span>
+            <Link to={o.para} className={`${ESTILO_ITEM_LISTA} min-h-18`}>
+              <span className="flex flex-1 flex-col">
+                <span className="font-medium">{o.rotulo}</span>
+                <span className="text-texto-suave">{o.descricao}</span>
+              </span>
+              <Icone nome="proximo" className="text-texto-suave" />
             </Link>
           </li>
         ))}
@@ -36,6 +40,7 @@ export default function Mais() {
       <Botao variante="secundario" className="mt-4 w-full" onClick={() => sair()}>
         Sair
       </Botao>
+      <Aviso texto={aviso} />
     </>
   );
 }

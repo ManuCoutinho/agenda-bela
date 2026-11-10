@@ -1,3 +1,4 @@
+import BarraSuperior from '../../componentes/BarraSuperior';
 import { Link, useNavigate, useParams } from 'react-router';
 import FormularioCliente from '../../componentes/FormularioCliente';
 import { ESTILO_LINK } from '../../componentes/estilos';
@@ -30,11 +31,11 @@ export default function EditarCliente() {
   if (id && (erro || !cliente)) {
     return (
       <>
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
+        <BarraSuperior titulo={titulo} voltarPara="/clientes" />
         <p role="alert" className="mt-4">
           Não encontramos essa cliente. Volte para a lista e tente de novo.
         </p>
-        <Link to="/clientes" className={`mt-4 inline-flex min-h-11 items-center ${ESTILO_LINK}`}>
+        <Link to="/clientes" className={`mt-4 inline-flex min-h-12 items-center ${ESTILO_LINK}`}>
           Voltar para clientes
         </Link>
       </>
@@ -43,7 +44,7 @@ export default function EditarCliente() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold">{titulo}</h1>
+      <BarraSuperior titulo={titulo} voltarPara="/clientes" />
       <FormularioCliente
         key={cliente?.id ?? 'nova'}
         inicial={

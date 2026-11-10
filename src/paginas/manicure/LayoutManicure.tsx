@@ -7,7 +7,7 @@ export default function LayoutManicure() {
 
   if (carregando) {
     return (
-      <p role="status" className="p-6 text-center text-gray-700">
+      <p role="status" className="p-6 text-center text-texto-suave">
         Carregando…
       </p>
     );

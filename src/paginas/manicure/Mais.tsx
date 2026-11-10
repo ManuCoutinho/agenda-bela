@@ -7,7 +7,7 @@ export default function Mais() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Mais</h1>
-      <p className="mt-4 text-gray-700">Conectada como {usuario?.email}</p>
+      <p className="mt-4 text-texto-suave">Conectada como {usuario?.email}</p>
       <Botao variante="secundario" className="mt-4 w-full" onClick={() => sair()}>
         Sair
       </Botao>

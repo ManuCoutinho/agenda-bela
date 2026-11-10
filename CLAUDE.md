@@ -50,7 +50,7 @@ Testes ao lado do arquivo (`.test.ts(x)`); testes de regras em `testes/regras/`.
 - Datas: fuso `America/Sao_Paulo`, `date-fns` + `@date-fns/tz` com `ptBR`; IDs de trava `AAAA-MM-DD_HHmm`.
 - Mensagens à usuária dizem o que fazer, sem códigos técnicos. Sem `console.log`.
 - Acessibilidade: alvos ≥ 44 px (`min-h-11`), texto ≥ 16 px, rótulo em todo campo, contraste 4,5:1.
-- Cores de estado no `@theme` de `src/index.css`: `marca`, `marcado`, `livre`, `bloqueado`, `pendente`.
+- Cores só pelos tokens do `@theme` em `src/index.css` (paleta do Espaço Juju): `marca`, `marca-escura`, `marca-suave`, `marca-decorativa` (só enfeite, nunca texto), `fundo`, `superficie`, `texto`, `texto-suave`, `borda`, `borda-campo`, `erro` e os estados `marcado`, `livre`, `bloqueado`, `pendente`. O ESLint recusa a paleta padrão do Tailwind (`text-gray-700`, `bg-white`, `[#hex]`). Combinação nova de cores entra em `PARES` de `src/tema.test.ts`, que confere o contraste AA.
 - Toda mudança em `firestore.rules` vem com teste em `testes/regras/`.
 - Versões fixadas: TypeScript ~6.0 e ESLint 9 (typescript-eslint e jsx-a11y ainda não suportam TS 7 / ESLint 10).
 - Vitest: em `beforeEach`, use chaves – uma função retornada vira rotina de limpeza.

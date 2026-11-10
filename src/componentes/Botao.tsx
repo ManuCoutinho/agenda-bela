@@ -3,8 +3,8 @@ import type { ButtonHTMLAttributes } from 'react';
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variante?: 'principal' | 'secundario' };
 
 const ESTILOS = {
-  principal: 'bg-marca text-white hover:bg-marca/90',
-  secundario: 'border border-marca text-marca hover:bg-marca/5',
+  principal: 'bg-marca text-superficie hover:bg-marca-escura',
+  secundario: 'border border-marca bg-superficie text-marca hover:bg-marca-suave',
 };
 
 export default function Botao({ variante = 'principal', className = '', ...props }: Props) {

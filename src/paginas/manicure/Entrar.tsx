@@ -28,13 +28,13 @@ export default function Entrar() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
       <div>
         <h1 className="text-3xl font-semibold text-marca">Agenda Bela</h1>
-        <p className="mt-2 text-gray-700">Sua agenda de atendimentos.</p>
+        <p className="mt-2 text-texto-suave">Sua agenda de atendimentos.</p>
       </div>
       <Botao onClick={entrar} disabled={carregando || entrando}>
         {entrando ? 'Entrando…' : 'Entrar com Google'}
       </Botao>
       {erro && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="text-erro">
           {erro}
         </p>
       )}

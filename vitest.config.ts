@@ -12,6 +12,8 @@ export default defineConfig({
           include: ['src/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
           setupFiles: ['./src/setupTests.ts'],
+          // o teste de contraste lê os tokens de index.css (`?raw`); o resto do CSS segue ignorado
+          css: { include: [/src\/index\.css/] },
         },
       },
       {

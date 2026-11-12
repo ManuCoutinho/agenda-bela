@@ -204,6 +204,23 @@ describe('pedidos (HU03)', () => {
     await assertFails(reservar(blocos(13, '2026-12-02')));
   });
 
+  it('RF14: página pausada não aceita pedido; reaberta, aceita', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx
+        .firestore()
+        .doc('config/publico')
+        .set({ pausa: { ativa: true, aviso: '' } }),
+    );
+    await assertFails(reservar(['2026-12-01_0900']));
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx
+        .firestore()
+        .doc('config/publico')
+        .set({ pausa: { ativa: false, aviso: '' } }),
+    );
+    await assertSucceeds(reservar(['2026-12-01_0900']));
+  });
+
   it('visitante não lê pedidos; manicure lê', async () => {
     await reservar(['2026-12-01_0900']);
     await assertFails(visitante().collection('pedidos').get());

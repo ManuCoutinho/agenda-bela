@@ -76,11 +76,29 @@ const paraRecorrentes = (d: DocumentData | undefined): Recorrente[] =>
       }))
     : [];
 
+/** RF14: com a página pausada, a cliente vê o aviso e não consegue pedir horário. */
+export type Pausa = { ativa: boolean; aviso: string };
+
+const paraPausa = (d: DocumentData | undefined): Pausa => ({
+  ativa: d?.pausa?.ativa === true,
+  aviso: typeof d?.pausa?.aviso === 'string' ? d.pausa.aviso : '',
+});
+
+export function observarPausa(aoMudar: (pausa: Pausa) => void, aoFalhar: (erro: Error) => void) {
+  return onSnapshot(configPublica, (snap) => aoMudar(paraPausa(snap.data())), aoFalhar);
+}
+
+/** Pausa ou reabre a página pública; funciona offline. */
+export function salvarPausa(pausa: Pausa) {
+  gravarEmSegundoPlano(setDoc(configPublica, { pausa }, { merge: true }));
+}
+
 /** Tudo o que a página pública lê; `null` se a manicure ainda não configurou nada. */
 export type PaginaPublica = {
   config: Configuracoes;
   servicos: Servico[];
   recorrentes: Recorrente[];
+  pausa: Pausa;
 };
 
 export function observarPaginaPublica(
@@ -96,6 +114,7 @@ export function observarPaginaPublica(
               config: paraConfiguracoes(snap.data()),
               servicos: paraServicos(snap.data()),
               recorrentes: paraRecorrentes(snap.data()),
+              pausa: paraPausa(snap.data()),
             }
           : null,
       ),

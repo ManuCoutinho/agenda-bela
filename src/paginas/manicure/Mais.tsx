@@ -16,6 +16,11 @@ const OPCOES = [
     descricao: 'Avisar as clientes pelo WhatsApp',
   },
   {
+    para: '/mais/pagina',
+    rotulo: 'Página de agendamento',
+    descricao: 'Link para as clientes e pausar agendamentos',
+  },
+  {
     para: '/mais/painel',
     rotulo: 'Painel do mês',
     descricao: 'Realizados, faltas e quanto entrou',

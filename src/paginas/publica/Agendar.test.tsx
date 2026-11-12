@@ -35,6 +35,7 @@ const PAGINA: PaginaPublica = {
     { id: 's2', nome: 'Teste interno', duracaoMin: 30, precoCentavos: 0, publico: false },
   ],
   recorrentes: [],
+  pausa: { ativa: false, aviso: '' },
 };
 
 function renderizar(rota = '/agendar/espaco-juju') {
@@ -143,5 +144,20 @@ describe('Página pública (RF08, RF09)', () => {
       'Marque a autorização para enviar o pedido.',
     );
     expect(reservar).not.toHaveBeenCalled();
+  });
+
+  it('RF14: página pausada mostra o aviso e não deixa pedir', () => {
+    vi.mocked(usePaginaPublica).mockReturnValue({
+      pagina: { ...PAGINA, pausa: { ativa: true, aviso: 'Volto dia 10 de janeiro.' } },
+      carregando: false,
+      erro: false,
+    });
+    renderizar();
+    expect(
+      screen.getByRole('heading', { name: 'Agendamentos pausados no momento' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Volto dia 10 de janeiro.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mão/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Falar no WhatsApp' })).toBeInTheDocument();
   });
 });

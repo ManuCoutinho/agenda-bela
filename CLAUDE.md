@@ -48,6 +48,7 @@ Testes ao lado do arquivo (`.test.ts(x)`); testes de regras em `testes/regras/`.
 
 - Domínio em inglês (`Agendamento`, `travas`, `horariosLivres`); convenções do ecossistema em inglês (`use…`, `on…`).
 - Datas: fuso `America/Sao_Paulo`, `date-fns` + `@date-fns/tz` com `ptBR`; IDs de trava `AAAA-MM-DD_HHmm`.
+- Calendário: FullCalendar 6.1 (MIT) só em `src/componentes/Calendario.tsx`; roda em UTC com a hora de parede de São Paulo (conversões em `src/dominio/calendario.ts`). A aba Agenda é carregada sob demanda (`lazy`).
 - Mensagens à usuária dizem o que fazer, sem códigos técnicos. Sem `console.log`.
 - Acessibilidade: alvos ≥ 48 px (`min-h-12`, padrão do Android), texto ≥ 16 px (mesmo onde o Material usa 12–14), rótulo em todo campo, contraste 4,5:1.
 - Visual de app Android (Material 3), 1 dp = 1 px CSS: tela = `BarraSuperior` (64 dp, seta de voltar) + conteúdo com 16 dp nas laterais + `Fab` para a ação principal + `BarraInferior` (80 dp); confirmações pelo snackbar `Aviso`. Use as classes de `src/componentes/estilos.ts` (`ESTILO_BOTAO`, `ESTILO_CAMPO` 56 dp, `ESTILO_LISTA`/`ESTILO_ITEM_LISTA`) e os ícones de `Icone.tsx`; espaçamento em múltiplos de 4/8 dp; tipografia `text-titulo`/`text-secao`; fonte do sistema (Roboto).

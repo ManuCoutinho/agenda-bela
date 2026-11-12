@@ -12,7 +12,7 @@ type GerenteDeContatos = {
 
 const gerente = () => (navigator as Navigator & { contacts?: GerenteDeContatos }).contacts;
 
-/** `true` no Chrome do Android; nos outros navegadores, usar o arquivo .vcf. */
+/** `true` no Chrome do Android; nos outros navegadores, só o cadastro à mão. */
 export const temSeletorDeContatos = () => typeof window !== 'undefined' && !!gerente();
 
 export async function escolherContatos(): Promise<ContatoImportado[]> {

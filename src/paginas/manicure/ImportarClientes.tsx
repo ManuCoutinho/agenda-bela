@@ -1,12 +1,11 @@
-import { useState, type ChangeEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
 import { ESTILO_BOTAO, ESTILO_LISTA } from '../../componentes/estilos';
 import { formatarWhatsApp } from '../../dominio/clientes';
 import {
   dddDe,
-  lerVcf,
   MOTIVO,
   paraNovasClientes,
   prepararImportacao,
@@ -18,7 +17,10 @@ import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { importarClientes } from '../../servicos/clientes';
 import { escolherContatos, temSeletorDeContatos } from '../../servicos/contatos';
 
-/** `/clientes/importar` (RF02): traz clientes dos contatos do celular ou de um .vcf. */
+/**
+ * `/clientes/importar` (RF02): traz clientes dos contatos do celular (seletor do
+ * Chrome no Android). Sem o seletor, a saída é cadastrar à mão.
+ */
 export default function ImportarClientes() {
   const navegar = useNavigate();
   const { clientes, carregando, erro } = useClientes();
@@ -26,12 +28,12 @@ export default function ImportarClientes() {
   const [candidatas, setCandidatas] = useState<Candidata[] | null>(null);
   const [marcadas, setMarcadas] = useState<Set<number>>(new Set());
   const [autorizou, setAutorizou] = useState(false);
-  const [mensagem, setMensagem] = useState<string>();
+  const [mensagem, setMensagem] = useState<{ texto: string; erro: boolean }>();
   const [erroAutorizacao, setErroAutorizacao] = useState(false);
 
   function receber(contatos: ContatoImportado[]) {
     if (contatos.length === 0) {
-      setMensagem('Nenhum contato foi escolhido. Tente de novo.');
+      setMensagem({ texto: 'Nenhum contato foi escolhido.', erro: false });
       return;
     }
     setMensagem(undefined);
@@ -45,20 +47,11 @@ export default function ImportarClientes() {
       receber(await escolherContatos());
     } catch (e) {
       console.error(e);
-      setMensagem('Não foi possível abrir os contatos. Tente pelo arquivo .vcf.');
+      setMensagem({
+        texto: 'Não foi possível abrir os contatos. Tente de novo ou cadastre a cliente à mão.',
+        erro: true,
+      });
     }
-  }
-
-  async function doArquivo(e: ChangeEvent<HTMLInputElement>) {
-    const arquivo = e.target.files?.[0];
-    e.target.value = '';
-    if (!arquivo) return;
-    const contatos = lerVcf(await arquivo.text());
-    if (contatos.length === 0) {
-      setMensagem('Esse arquivo não tem contatos. Escolha o arquivo .vcf exportado do Contatos.');
-      return;
-    }
-    receber(contatos);
   }
 
   function alternar(chave: number) {
@@ -98,24 +91,29 @@ export default function ImportarClientes() {
         </p>
       ) : candidatas === null ? (
         <div className="flex flex-col gap-4">
-          <p>Escolha as clientes nos contatos do seu celular. Nada é enviado sem você escolher.</p>
-          {temSeletorDeContatos() && <Botao onClick={doCelular}>Escolher dos contatos</Botao>}
-          <label className={`${ESTILO_BOTAO.secundario} cursor-pointer`}>
-            Abrir arquivo .vcf
-            <input
-              type="file"
-              accept=".vcf,text/vcard,text/x-vcard"
-              onChange={doArquivo}
-              className="sr-only"
-            />
-          </label>
-          <p className="text-texto-suave">
-            Para gerar o arquivo no Android: app Contatos → Corrigir e gerenciar → Exportar para
-            arquivo.
-          </p>
+          {temSeletorDeContatos() ? (
+            <>
+              <p>
+                Escolha as clientes nos contatos do seu celular. Só sai do celular quem você
+                escolher.
+              </p>
+              <Botao onClick={doCelular}>Escolher dos contatos</Botao>
+            </>
+          ) : (
+            <p>
+              Este navegador não abre os contatos do celular. Para importar, use o Chrome no
+              Android; ou cadastre a cliente à mão.
+            </p>
+          )}
+          <Link to="/clientes/nova" className={ESTILO_BOTAO.secundario}>
+            Cadastrar à mão
+          </Link>
           {mensagem && (
-            <p role="alert" className="text-erro">
-              {mensagem}
+            <p
+              role={mensagem.erro ? 'alert' : 'status'}
+              className={mensagem.erro ? 'text-erro' : 'text-texto-suave'}
+            >
+              {mensagem.texto}
             </p>
           )}
         </div>

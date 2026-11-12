@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router';
 import App from './App';
 import ProvedorAuth from './hooks/ProvedorAuth';
 import './index.css';
+// escuta o pedido de instalação do Chrome desde o início
+import './servicos/instalacao';
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

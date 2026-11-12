@@ -49,6 +49,7 @@ const PARES: [string, string, number][] = [
   ['marcado', 'fundo', TEXTO],
   ['livre', 'fundo', TEXTO],
   ['bloqueado', 'fundo', TEXTO],
+  ['livre', 'superficie', TEXTO], // "Lembrete enviado"
   ['texto', 'pendente', TEXTO],
   ['superficie', 'marcado', TEXTO], // atendimento no calendário
   ['superficie', 'bloqueado', TEXTO], // bloqueio no calendário

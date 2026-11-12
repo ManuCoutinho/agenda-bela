@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Desenvolvimento: UID da conta Google de testes da Manu. No teste final, trocar pelo UID
-    // da manicure (Authentication > Usuários) e publicar: firebase deploy --only firestore
+    // O marcador vira o UID da manicure (UID_MANICURE no .env.local) quando as regras
+    // são geradas: scripts/gerar-regras.mjs, que roda antes de firebase deploy --only firestore.
     function uidDaManicure() {
-      return '8NQSmyAg9FauSluuHBuhkPtumsB2';
+      return '__UID_DA_MANICURE__';
     }
 
     function isOwner() {
@@ -43,14 +43,14 @@ service cloud.firestore {
         && request.resource.data.consentimento == true
         && request.resource.data.status == 'pendente'
         && request.resource.data.criadoEm == request.time
-        // RN03 no servidor: nada no passado nem além de 31 dias
+        // RN03 no servidor: nada no passado nem além da maior janela (90 dias)
         && request.resource.data.inicio is timestamp
         && request.resource.data.inicio > request.time
-        && request.resource.data.inicio < request.time + duration.value(31, 'd')
-        // até 10 blocos de 30 min (5 h), todos travados no mesmo lote
+        && request.resource.data.inicio < request.time + duration.value(92, 'd')
+        // até 12 blocos de 30 min (serviço de 5 h + 1 h de intervalo), todos travados no mesmo lote
         && request.resource.data.travas is list
         && request.resource.data.travas.size() >= 1
-        && request.resource.data.travas.size() <= 10
+        && request.resource.data.travas.size() <= 12
         && travaNaPosicao(request.resource.data.travas, 0)
         && travaNaPosicao(request.resource.data.travas, 1)
         && travaNaPosicao(request.resource.data.travas, 2)
@@ -60,7 +60,9 @@ service cloud.firestore {
         && travaNaPosicao(request.resource.data.travas, 6)
         && travaNaPosicao(request.resource.data.travas, 7)
         && travaNaPosicao(request.resource.data.travas, 8)
-        && travaNaPosicao(request.resource.data.travas, 9);
+        && travaNaPosicao(request.resource.data.travas, 9)
+        && travaNaPosicao(request.resource.data.travas, 10)
+        && travaNaPosicao(request.resource.data.travas, 11);
     }
 
     match /travas/{id} {

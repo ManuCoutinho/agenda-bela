@@ -1,5 +1,6 @@
 import { doc, onSnapshot, setDoc, type DocumentData } from 'firebase/firestore';
 import { CONFIGURACOES_PADRAO, type Configuracoes } from '../dominio/configuracoes';
+import type { Recorrente } from '../dominio/disponibilidade';
 import type { Servico } from '../dominio/servicos';
 import { db, gravarEmSegundoPlano } from './firebase';
 
@@ -64,4 +65,40 @@ export function observarConfiguracoes(
 /** Mescla com os serviços que já estão no documento. */
 export function salvarConfiguracoes(config: Configuracoes) {
   gravarEmSegundoPlano(setDoc(configPublica, config, { merge: true }));
+}
+
+const paraRecorrentes = (d: DocumentData | undefined): Recorrente[] =>
+  Array.isArray(d?.recorrentes)
+    ? d.recorrentes.map((r: DocumentData) => ({
+        dia: Number(r.dia),
+        ini: String(r.ini),
+        fim: String(r.fim),
+      }))
+    : [];
+
+/** Tudo o que a página pública lê; `null` se a manicure ainda não configurou nada. */
+export type PaginaPublica = {
+  config: Configuracoes;
+  servicos: Servico[];
+  recorrentes: Recorrente[];
+};
+
+export function observarPaginaPublica(
+  aoMudar: (pagina: PaginaPublica | null) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    configPublica,
+    (snap) =>
+      aoMudar(
+        snap.exists()
+          ? {
+              config: paraConfiguracoes(snap.data()),
+              servicos: paraServicos(snap.data()),
+              recorrentes: paraRecorrentes(snap.data()),
+            }
+          : null,
+      ),
+    aoFalhar,
+  );
 }

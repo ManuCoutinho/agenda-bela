@@ -20,7 +20,7 @@ import { horasRecorrentesNoDia } from '../../dominio/bloqueios';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
-import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
+import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
 
 const ERRO_CARREGAR = 'Não foi possível carregar os dados. Confira a internet e tente de novo.';
 
@@ -83,9 +83,10 @@ export default function EditarAtendimento() {
           servicoId: servico.id,
           servicoNome: servico.nome,
           duracaoMin: servico.duracaoMin,
+          precoCentavos: servico.precoCentavos,
           inicio,
           travas: idsTravas(inicio, servico.duracaoMin, config.intervaloMin),
-          status: 'marcado',
+          status: atual?.status ?? 'marcado',
           observacao: d.observacao,
         },
         id,
@@ -104,6 +105,20 @@ export default function EditarAtendimento() {
         setErroEnvio('Não foi possível salvar. Confira a internet e tente de novo.');
       }
     }
+  }
+
+  function resultado(status: 'realizado' | 'falta' | 'marcado') {
+    if (!atual) return;
+    registrarResultado(atual.id, status);
+    if (status === 'marcado') return; // desfazer: continua na tela
+    navegar(destino(dataDoDia(atual.inicio)), {
+      state: {
+        aviso:
+          status === 'realizado'
+            ? `Atendimento de ${atual.clienteNome} realizado.`
+            : `Falta de ${atual.clienteNome} registrada.`,
+      },
+    });
   }
 
   function cancelar() {
@@ -207,7 +222,32 @@ export default function EditarAtendimento() {
         erroEnvio={erroEnvio}
       />
 
-      {atual && (
+      {atual && atual.inicio <= new Date() && (
+        <section aria-labelledby="resultado" className="mt-10 border-t border-borda pt-6">
+          <h2 id="resultado" className="text-secao font-medium">
+            Como foi?
+          </h2>
+          {atual.status === 'marcado' ? (
+            <div className="mt-3 flex flex-col gap-3">
+              <Botao onClick={() => resultado('realizado')}>Atendimento realizado</Botao>
+              <Botao variante="secundario" onClick={() => resultado('falta')}>
+                A cliente faltou
+              </Botao>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-3">
+              <p role="status">
+                {atual.status === 'realizado' ? 'Marcado como realizado.' : 'Marcado como falta.'}
+              </p>
+              <Botao variante="secundario" onClick={() => resultado('marcado')}>
+                Desfazer
+              </Botao>
+            </div>
+          )}
+        </section>
+      )}
+
+      {atual && atual.status === 'marcado' && (
         <section aria-labelledby="cancelar" className="mt-10 border-t border-borda pt-6">
           <h2 id="cancelar" className="text-secao font-medium">
             Cancelar atendimento

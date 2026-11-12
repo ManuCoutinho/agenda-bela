@@ -7,6 +7,7 @@ import {
   runTransaction,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -34,8 +35,10 @@ const paraAgendamento = (id: string, d: DocumentData): Agendamento => ({
   duracaoMin: Number(d.duracaoMin ?? 30),
   inicio: paraData(d.inicio) ?? new Date(0),
   travas: Array.isArray(d.travas) ? d.travas.map(String) : [],
-  status: d.status === 'cancelado' ? 'cancelado' : 'marcado',
+  status: (['cancelado', 'realizado', 'falta'] as const).find((s) => s === d.status) ?? 'marcado',
+  precoCentavos: typeof d.precoCentavos === 'number' ? d.precoCentavos : undefined,
   observacao: String(d.observacao ?? ''),
+  lembreteEnviado: d.lembreteEm instanceof Timestamp,
 });
 
 /** Atendimentos com início em [de, ate), em ordem de horário. */
@@ -137,4 +140,16 @@ export function cancelarAtendimento(agendamento: Pick<Agendamento, 'id' | 'trava
   });
   for (const travaId of agendamento.travas) lote.delete(doc(travas, travaId));
   gravarEmSegundoPlano(lote.commit());
+}
+
+/** RF11: guarda que o lembrete foi enviado (some do aviso e do número no ícone). */
+export function marcarLembreteEnviado(id: string) {
+  gravarEmSegundoPlano(updateDoc(doc(agendamentos, id), { lembreteEm: serverTimestamp() }));
+}
+
+/** RF13: realizado, falta ou de volta a marcado (desfazer). Funciona offline. */
+export function registrarResultado(id: string, status: 'realizado' | 'falta' | 'marcado') {
+  gravarEmSegundoPlano(
+    updateDoc(doc(agendamentos, id), { status, atualizadoEm: serverTimestamp() }),
+  );
 }

@@ -8,9 +8,9 @@ import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-const REGRAS = readFileSync('firestore.rules', 'utf8');
-/** O UID vem das próprias regras: trocar o UID na entrega não exige mudar os testes. */
-const MANICURE = /function uidDaManicure\(\) \{\s*return '([^']+)';/.exec(REGRAS)?.[1] ?? '';
+/** As regras geradas por `scripts/gerar-regras.mjs --teste` (o `pnpm test:regras` gera antes). */
+const REGRAS = readFileSync('.firebase/firestore.rules', 'utf8');
+const MANICURE = 'manicure-de-teste';
 const HORA = 3_600_000;
 
 let env: RulesTestEnvironment;
@@ -68,9 +68,17 @@ describe('dados privados (RNF07)', () => {
     await assertFails(db.doc('pedidos/p1').get());
   });
 
-  it('regras têm um UID real, não o texto provisório', () => {
-    expect(MANICURE).toMatch(/^[A-Za-z0-9]{20,128}$/);
-    expect(MANICURE).not.toBe('UID_DA_MANICURE');
+  it('nenhum UID real fica no Git: o modelo só tem o marcador', () => {
+    const modelo = readFileSync('firestore.rules', 'utf8');
+    expect(modelo).toContain("return '__UID_DA_MANICURE__';");
+    expect(REGRAS).toContain(`return '${MANICURE}';`);
+  });
+
+  it('só a manicure lê e grava os celulares que recebem avisos (config/notificacoes)', async () => {
+    const ref = (db: ReturnType<typeof visitante>) => db.doc('config/notificacoes');
+    await assertSucceeds(ref(manicure()).set({ tokens: ['t1'] }));
+    await assertFails(ref(visitante()).get());
+    await assertFails(ref(env.authenticatedContext('outra').firestore()).set({ tokens: ['x'] }));
   });
 
   it('outra conta Google também não lê clientes', async () => {
@@ -182,7 +190,18 @@ describe('pedidos (HU03)', () => {
   it('não aceita início no passado nem além da janela (RN03)', async () => {
     const ids = ['2026-12-01_0900'];
     await assertFails(reservar(ids, pedido(ids, { inicio: daqui(-1) })));
-    await assertFails(reservar(ids, pedido(ids, { inicio: daqui(32 * 24) })));
+    await assertFails(reservar(ids, pedido(ids, { inicio: daqui(93 * 24) })));
+    await assertSucceeds(reservar(ids, pedido(ids, { inicio: daqui(90 * 24) })));
+  });
+
+  it('aceita até 12 blocos (5 h + 1 h de intervalo), não 13', async () => {
+    const blocos = (n: number, dia: string) =>
+      Array.from({ length: n }, (_, i) => {
+        const m = 8 * 60 + i * 30;
+        return `${dia}_${String(Math.floor(m / 60)).padStart(2, '0')}${String(m % 60).padStart(2, '0')}`;
+      });
+    await assertSucceeds(reservar(blocos(12, '2026-12-01')));
+    await assertFails(reservar(blocos(13, '2026-12-02')));
   });
 
   it('visitante não lê pedidos; manicure lê', async () => {

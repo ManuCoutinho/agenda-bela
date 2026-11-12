@@ -12,7 +12,8 @@ export const FUSO = 'America/Sao_Paulo';
  */
 export const FAIXA_MARCACAO = { ini: 6 * 60, fim: 22 * 60 };
 
-export type StatusAgendamento = 'marcado' | 'cancelado';
+/** RF13: depois do horário, a manicure registra se foi realizado ou se a cliente faltou. */
+export type StatusAgendamento = 'marcado' | 'cancelado' | 'realizado' | 'falta';
 
 export type Agendamento = {
   id: string;
@@ -27,6 +28,10 @@ export type Agendamento = {
   travas: string[];
   status: StatusAgendamento;
   observacao: string;
+  /** Preço do serviço no dia em que foi marcado (para o painel do mês). */
+  precoCentavos?: number;
+  /** A manicure já tocou em "Enviar lembrete" (RF11). */
+  lembreteEnviado?: boolean;
 };
 
 export type NovoAgendamento = Omit<Agendamento, 'id'>;
@@ -67,6 +72,15 @@ export const rotuloHora = (hora: string) => `${hora.slice(0, 2)}:${hora.slice(2)
 /** '2026-11-10' → 'terça-feira, 10 de novembro' */
 export const rotuloDia = (data: string) =>
   format(inicioEm(data, '1200'), "EEEE, d 'de' MMMM", { locale: ptBR });
+
+/** '2026-12-01' → { semana: 'ter', dia: '1 dez' } (botões de dia) */
+export const rotuloDiaCurto = (data: string) => {
+  const d = noFuso(inicioEm(data, '1200'));
+  return {
+    semana: format(d, 'EEEEEE', { locale: ptBR }),
+    dia: format(d, 'd MMM', { locale: ptBR }),
+  };
+};
 
 export const somarDias = (data: string, dias: number) =>
   dataDoDia(addDays(inicioEm(data, '1200'), dias));
@@ -128,11 +142,11 @@ export function horariosParaMarcar(
 export const fimDe = (a: Pick<Agendamento, 'inicio' | 'duracaoMin'>) =>
   addMinutes(a.inicio, a.duracaoMin);
 
-/** Atendimentos marcados, por dia (AAAA-MM-DD) e em ordem de horário. */
+/** Atendimentos que não foram cancelados, por dia (AAAA-MM-DD) e em ordem de horário. */
 export function agruparPorDia(agendamentos: readonly Agendamento[]) {
   const porDia = new Map<string, Agendamento[]>();
   const marcados = agendamentos
-    .filter((a) => a.status === 'marcado')
+    .filter((a) => a.status !== 'cancelado')
     .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
   for (const a of marcados) {
     const dia = dataDoDia(a.inicio);
@@ -151,3 +165,10 @@ export const esquemaAtendimento = z.object({
 
 export type CamposAtendimento = z.input<typeof esquemaAtendimento>;
 export type DadosAtendimento = z.output<typeof esquemaAtendimento>;
+
+/** RF11: atendimentos marcados para amanhã (São Paulo), em ordem de horário. */
+export function atendimentosDeAmanha(agendamentos: readonly Agendamento[], agora: Date) {
+  return (agruparPorDia(agendamentos).get(somarDias(dataDoDia(agora), 1)) ?? []).filter(
+    (a) => a.status === 'marcado',
+  );
+}

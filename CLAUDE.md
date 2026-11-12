@@ -15,14 +15,15 @@ pnpm lint
 pnpm test           # domínio e telas (Vitest, jsdom)
 pnpm test:regras    # firestore.rules no emulador (precisa de Java 21 e firebase CLI)
 pnpm build
-firebase deploy --only firestore   # regras: deploy manual, nunca pelo CI
+firebase deploy --only firestore   # regras: deploy manual, nunca pelo CI (gera antes com o UID do .env.local)
 ```
 
 ## Ambiente (WSL)
 
 - Node via nvm; o Firebase CLI está instalado no Node 22.14.0. Em shells não interativos, rode `source ~/.nvm/nvm.sh && nvm use 22.14.0` antes de `pnpm`/`firebase`.
 - Firebase CLI logado em `espacojuju.unhas@gmail.com`; projeto `agenda-bela-bb595` (`.firebaserc`).
-- `.env.local` (fora do Git) já tem a configuração `VITE_FIREBASE_*`. `VITE_USAR_EMULADOR=true` aponta o app para o emulador.
+- `.env.local` (fora do Git) já tem a configuração `VITE_FIREBASE_*` e o `UID_MANICURE`. `VITE_USAR_EMULADOR=true` aponta o app para o emulador.
+- UID da manicure fora do Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`; `scripts/gerar-regras.mjs` gera `.firebase/firestore.rules` (predeploy do `firebase deploy`, `pnpm regras:gerar` antes de subir o emulador; `--teste` usa um UID fictício). Trocar a dona = trocar `UID_MANICURE` e publicar.
 
 ## Git
 

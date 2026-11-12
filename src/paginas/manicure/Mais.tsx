@@ -7,8 +7,19 @@ import { ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
 import { useAuth } from '../../hooks/useAuth';
 import { useAviso } from '../../hooks/useAviso';
 import { sair } from '../../servicos/autenticacao';
+import AvisosLembrete from './AvisosLembrete';
 
 const OPCOES = [
+  {
+    para: '/lembretes',
+    rotulo: 'Lembretes de amanhã',
+    descricao: 'Avisar as clientes pelo WhatsApp',
+  },
+  {
+    para: '/mais/painel',
+    rotulo: 'Painel do mês',
+    descricao: 'Realizados, faltas e quanto entrou',
+  },
   { para: '/mais/servicos', rotulo: 'Serviços', descricao: 'Nome, duração e preço' },
   {
     para: '/mais/bloqueios',
@@ -41,6 +52,7 @@ export default function Mais() {
           </li>
         ))}
       </ul>
+      <AvisosLembrete />
       <p className="mt-6 text-texto-suave">Conectada como {usuario?.email}</p>
       <Botao variante="secundario" className="mt-4 w-full" onClick={() => sair()}>
         Sair

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  atendimentosDeAmanha,
   agruparPorDia,
   dataDoDia,
   diaDaSemana,
@@ -128,5 +129,34 @@ describe('agruparPorDia', () => {
     ]);
     expect(grupos.get('2026-11-10')?.map((a) => a.id)).toEqual(['a', 'b']);
     expect(grupos.get('2026-11-11')?.map((a) => a.id)).toEqual(['c']);
+  });
+});
+
+describe('atendimentosDeAmanha (RF11)', () => {
+  it('pega o dia seguinte no fuso de São Paulo', () => {
+    const a = (id: string, data: string, hora: string) => ({
+      id,
+      clienteId: 'c',
+      clienteNome: id,
+      clienteWhatsapp: '',
+      servicoId: 's',
+      servicoNome: 'Mão',
+      duracaoMin: 60,
+      inicio: inicioEm(data, hora),
+      travas: [],
+      status: 'marcado' as const,
+      observacao: '',
+    });
+    // 23h do dia 1 em SP já é dia 2 em UTC
+    const agora = new Date('2026-12-02T02:00:00Z');
+    const r = atendimentosDeAmanha(
+      [
+        a('hoje', '2026-12-01', '2300'),
+        a('tarde', '2026-12-02', '1500'),
+        a('cedo', '2026-12-02', '0800'),
+      ],
+      agora,
+    );
+    expect(r.map((x) => x.id)).toEqual(['cedo', 'tarde']);
   });
 });

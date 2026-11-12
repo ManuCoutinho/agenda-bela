@@ -9,7 +9,7 @@ import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { useBloqueios } from '../../hooks/useBloqueios';
-import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
+import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
 import EditarAtendimento from './EditarAtendimento';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
@@ -20,6 +20,7 @@ vi.mock('../../hooks/useAgenda', () => ({ useAgendamento: vi.fn(), useOcupados: 
 vi.mock('../../servicos/agenda', () => ({
   marcarAtendimento: vi.fn(),
   cancelarAtendimento: vi.fn(),
+  registrarResultado: vi.fn(),
 }));
 
 const ANA = {
@@ -187,5 +188,21 @@ describe('EditarAtendimento (RF07)', () => {
       'href',
       '/clientes/nova',
     );
+  });
+
+  it('RF13: depois do horário, registra realizado ou falta', async () => {
+    const passado = { ...ATUAL, inicio: inicioEm('2020-01-07', '1000') };
+    vi.mocked(useAgendamento).mockReturnValue({ dados: passado, carregando: false, erro: false });
+    renderizar('/atendimentos/a1');
+    expect(screen.getByRole('heading', { name: 'Como foi?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'A cliente faltou' }));
+    expect(registrarResultado).toHaveBeenCalledWith('a1', 'falta');
+    expect(await screen.findByText(/Falta de Ana registrada\./)).toBeInTheDocument();
+  });
+
+  it('RF13: antes do horário, não pergunta como foi', () => {
+    vi.mocked(useAgendamento).mockReturnValue({ dados: ATUAL, carregando: false, erro: false });
+    renderizar('/atendimentos/a1');
+    expect(screen.queryByRole('heading', { name: 'Como foi?' })).not.toBeInTheDocument();
   });
 });

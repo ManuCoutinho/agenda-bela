@@ -14,6 +14,8 @@ vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
 vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/bloqueios', () => ({ bloquearHorario: vi.fn() }));
+// os pedidos têm o próprio teste (PedidosPendentes.test.tsx)
+vi.mock('./PedidosPendentes', () => ({ default: () => null }));
 
 const ag = (id: string, hora: string, status: Agendamento['status'] = 'marcado'): Agendamento => ({
   id,
@@ -145,5 +147,30 @@ describe('Hoje (RF07)', () => {
     expect(
       screen.queryByRole('button', { name: 'Bloquear o resto do dia' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('avisa os lembretes de amanhã que faltam enviar', () => {
+    const amanha = (id: string, extra: Partial<Agendamento> = {}) => ({
+      ...ag(id, '1000'),
+      inicio: inicioEm('2026-11-11', '1000'),
+      ...extra,
+    });
+    vi.mocked(useAgendamentos).mockReturnValue({
+      dados: [amanha('a'), amanha('b', { lembreteEnviado: true })],
+      carregando: false,
+      erro: false,
+    });
+    render(
+      <MemoryRouter>
+        <Hoje />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText('Amanhã você tem 2 atendimentos. Falta 1 lembrete.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Enviar lembretes' })).toHaveAttribute(
+      'href',
+      '/lembretes',
+    );
   });
 });

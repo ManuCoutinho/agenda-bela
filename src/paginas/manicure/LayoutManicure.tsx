@@ -1,9 +1,10 @@
 import { Navigate, Outlet } from 'react-router';
 import BarraInferior from '../../componentes/BarraInferior';
 import { useAuth } from '../../hooks/useAuth';
+import AcessoNegado from '../AcessoNegado';
 
 export default function LayoutManicure() {
-  const { usuario, carregando } = useAuth();
+  const { usuario, carregando, acessoNegado } = useAuth();
 
   if (carregando) {
     return (
@@ -13,6 +14,7 @@ export default function LayoutManicure() {
     );
   }
   if (!usuario) return <Navigate to="/entrar" replace />;
+  if (acessoNegado) return <AcessoNegado email={usuario.email} />;
 
   // 16 dp nas laterais; embaixo, espaço para a barra (80 dp) e o FAB (56 + 16 dp)
   return (

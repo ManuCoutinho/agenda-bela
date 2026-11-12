@@ -10,7 +10,7 @@ vi.mock('../../servicos/autenticacao', () => ({ entrarComGoogle: vi.fn() }));
 
 function renderizar() {
   return render(
-    <ContextoAuth.Provider value={{ usuario: null, carregando: false }}>
+    <ContextoAuth.Provider value={{ usuario: null, carregando: false, acessoNegado: false }}>
       <MemoryRouter>
         <Entrar />
       </MemoryRouter>

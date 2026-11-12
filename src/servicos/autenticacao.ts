@@ -6,7 +6,8 @@ import {
   type User,
 } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
-import { auth, google } from './firebase';
+import { doc, getDocFromServer } from 'firebase/firestore';
+import { auth, db, google } from './firebase';
 
 export type Usuario = { uid: string; nome: string | null; email: string | null };
 
@@ -36,3 +37,18 @@ export async function entrarComGoogle(): Promise<'ok' | 'cancelado'> {
 }
 
 export const sair = () => signOut(auth);
+
+/**
+ * As regras só deixam a dona da agenda ler `config/*` além de `config/publico`.
+ * Lê um documento privado direto no servidor: recusa = outra conta Google.
+ * Sem internet não dá para saber; segue como permitido (o cache só tem dados
+ * de quem já teve acesso, e as telas avisam quando não carregam).
+ */
+export async function verificarAcesso(): Promise<'permitido' | 'negado'> {
+  try {
+    await getDocFromServer(doc(db, 'config', 'acesso'));
+    return 'permitido';
+  } catch (e) {
+    return e instanceof FirebaseError && e.code === 'permission-denied' ? 'negado' : 'permitido';
+  }
+}

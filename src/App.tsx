@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import PaginaNaoEncontrada from './paginas/PaginaNaoEncontrada';
+import Bloqueios from './paginas/manicure/Bloqueios';
 import Clientes from './paginas/manicure/Clientes';
 import Configuracoes from './paginas/manicure/Configuracoes';
 import EditarAtendimento from './paginas/manicure/EditarAtendimento';
+import EditarBloqueio from './paginas/manicure/EditarBloqueio';
 import EditarCliente from './paginas/manicure/EditarCliente';
 import EditarServico from './paginas/manicure/EditarServico';
 import Entrar from './paginas/manicure/Entrar';
@@ -50,6 +52,9 @@ export default function App() {
         <Route path="mais/servicos" element={<Servicos />} />
         <Route path="mais/servicos/novo" element={<EditarServico />} />
         <Route path="mais/servicos/:id" element={<EditarServico />} />
+        <Route path="mais/bloqueios" element={<Bloqueios />} />
+        <Route path="mais/bloqueios/novo" element={<EditarBloqueio />} />
+        <Route path="mais/bloqueios/:id" element={<EditarBloqueio />} />
       </Route>
       <Route path="*" element={<PaginaNaoEncontrada />} />
     </Routes>

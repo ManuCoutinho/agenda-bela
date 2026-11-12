@@ -4,7 +4,12 @@ import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { useEffect, useRef } from 'react';
-import { lerToque, type EventoCalendario, type Visao } from '../dominio/calendario';
+import {
+  lerToque,
+  type EventoCalendario,
+  type TipoEvento,
+  type Visao,
+} from '../dominio/calendario';
 
 type Props = {
   visao: Visao;
@@ -15,7 +20,7 @@ type Props = {
   agora: string;
   aoTocarDia: (data: string) => void;
   aoTocarHorario: (data: string, hora: string) => void;
-  aoTocarEvento: (id: string) => void;
+  aoTocarEvento: (id: string, tipo: TipoEvento) => void;
 };
 
 const VIEW: Record<Visao, string> = { semana: 'timeGridWeek', mes: 'dayGridMonth' };
@@ -55,7 +60,14 @@ export default function Calendario({
         firstDay={0}
         headerToolbar={false}
         height="auto"
-        events={eventos.map((e) => ({ id: e.id, title: e.titulo, start: e.inicio, end: e.fim }))}
+        events={eventos.map((e) => ({
+          id: e.id,
+          title: e.titulo,
+          start: e.inicio,
+          end: e.fim,
+          classNames: [`evento-${e.tipo}`],
+          extendedProps: { tipo: e.tipo },
+        }))}
         eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
         nowIndicator
         navLinks
@@ -69,7 +81,7 @@ export default function Calendario({
         }}
         eventClick={(info) => {
           info.jsEvent.preventDefault();
-          aoTocarEvento(info.event.id);
+          aoTocarEvento(info.event.id, info.event.extendedProps.tipo as TipoEvento);
         }}
         views={{
           dayGridMonth: {

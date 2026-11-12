@@ -11,6 +11,11 @@ import { sair } from '../../servicos/autenticacao';
 const OPCOES = [
   { para: '/mais/servicos', rotulo: 'Serviços', descricao: 'Nome, duração e preço' },
   {
+    para: '/mais/bloqueios',
+    rotulo: 'Bloqueios',
+    descricao: 'Horários em que você não atende',
+  },
+  {
     para: '/mais/configuracoes',
     rotulo: 'Configurações',
     descricao: 'Horário de atendimento, link e regras do agendamento',

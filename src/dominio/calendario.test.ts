@@ -7,6 +7,7 @@ import {
   lerToque,
   lerVisao,
   paraEventos,
+  paraEventosDeBloqueio,
   paraHoraDeParede,
   passarPeriodo,
   tituloDaVisao,
@@ -77,7 +78,51 @@ describe('conversão para o FullCalendar', () => {
   it('mostra só os marcados, com cliente, serviço e fim pela duração', () => {
     const eventos = paraEventos([atendimento(), atendimento({ id: 'a2', status: 'cancelado' })]);
     expect(eventos).toEqual([
-      { id: 'a1', titulo: 'Ana · Mão', inicio: '2026-11-12T14:30:00', fim: '2026-11-12T16:00:00' },
+      {
+        id: 'a1',
+        tipo: 'atendimento',
+        titulo: 'Ana · Mão',
+        inicio: '2026-11-12T14:30:00',
+        fim: '2026-11-12T16:00:00',
+      },
+    ]);
+  });
+});
+
+describe('bloqueios no calendário', () => {
+  it('recorrente aparece em toda semana do período; pontual só no dia', () => {
+    const eventos = paraEventosDeBloqueio(
+      [
+        { id: 'r1', tipo: 'recorrente', dia: 2, ini: '14:00', fim: '15:00', descricao: 'Terapia' },
+        {
+          id: 'p1',
+          tipo: 'pontual',
+          data: '2026-11-13',
+          ini: '09:00',
+          fim: '10:00',
+          descricao: '',
+          travas: [],
+        },
+      ],
+      '2026-11-08',
+      14,
+    );
+    expect(eventos).toEqual([
+      {
+        id: 'r1',
+        tipo: 'bloqueio',
+        titulo: 'Bloqueado · Terapia',
+        inicio: '2026-11-10T14:00:00',
+        fim: '2026-11-10T15:00:00',
+      },
+      {
+        id: 'p1',
+        tipo: 'bloqueio',
+        titulo: 'Bloqueado',
+        inicio: '2026-11-13T09:00:00',
+        fim: '2026-11-13T10:00:00',
+      },
+      expect.objectContaining({ id: 'r1', inicio: '2026-11-17T14:00:00' }),
     ]);
   });
 });

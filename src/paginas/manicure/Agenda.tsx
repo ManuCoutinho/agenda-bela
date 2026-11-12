@@ -1,4 +1,4 @@
-import { useSearchParams, useNavigate } from 'react-router';
+import { Link, useSearchParams, useNavigate } from 'react-router';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
@@ -6,13 +6,15 @@ import Calendario from '../../componentes/Calendario';
 import Fab from '../../componentes/Fab';
 import Icone from '../../componentes/Icone';
 import ListaDoDia from '../../componentes/ListaDoDia';
-import { ESTILO_BOTAO_ICONE } from '../../componentes/estilos';
+import { ESTILO_BOTAO, ESTILO_BOTAO_ICONE } from '../../componentes/estilos';
 import { agruparPorDia, dataDoDia, rotuloDia } from '../../dominio/agenda';
+import { bloqueiosDoDia } from '../../dominio/bloqueios';
 import {
   dataValida,
   intervaloDaVisao,
   lerVisao,
   paraEventos,
+  paraEventosDeBloqueio,
   paraHoraDeParede,
   passarPeriodo,
   tituloDaVisao,
@@ -20,6 +22,7 @@ import {
 } from '../../dominio/calendario';
 import { useAgendamentos } from '../../hooks/useAgenda';
 import { useAviso } from '../../hooks/useAviso';
+import { useBloqueios } from '../../hooks/useBloqueios';
 
 const VISOES: { visao: Visao; rotulo: string }[] = [
   { visao: 'semana', rotulo: 'Semana' },
@@ -41,6 +44,7 @@ export default function Agenda() {
 
   const { inicio, dias } = intervaloDaVisao(visao, dia);
   const { dados, carregando, erro } = useAgendamentos(inicio, dias);
+  const { bloqueios } = useBloqueios();
   const aviso = useAviso();
   const doDia = agruparPorDia(dados).get(dia) ?? [];
 
@@ -110,23 +114,40 @@ export default function Agenda() {
       <Calendario
         visao={visao}
         dia={dia}
-        eventos={paraEventos(dados)}
+        eventos={[...paraEventos(dados), ...paraEventosDeBloqueio(bloqueios, inicio, dias)]}
         agora={paraHoraDeParede(new Date())}
         aoTocarDia={(d) => ir({ dia: d })}
         aoTocarHorario={(d, hora) => navegar(`/atendimentos/novo?data=${d}&hora=${hora}`)}
-        aoTocarEvento={(id) => navegar(`/atendimentos/${id}`)}
+        aoTocarEvento={(id, tipo) =>
+          navegar(tipo === 'bloqueio' ? `/mais/bloqueios/${id}` : `/atendimentos/${id}`)
+        }
       />
 
       <section aria-labelledby="dia-escolhido" className="mt-6">
-        <h2 id="dia-escolhido" className="mb-2 text-secao font-medium first-letter:uppercase">
-          {dia === hoje ? `Hoje, ${rotuloDia(dia)}` : rotuloDia(dia)}
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <h2 id="dia-escolhido" className="text-secao font-medium first-letter:uppercase">
+            {dia === hoje ? `Hoje, ${rotuloDia(dia)}` : rotuloDia(dia)}
+          </h2>
+          <Link
+            to={`/mais/bloqueios/novo?data=${dia}`}
+            aria-label={`Bloquear horário em ${rotuloDia(dia)}`}
+            className={ESTILO_BOTAO.texto}
+          >
+            Bloquear
+          </Link>
+        </div>
         {carregando ? (
           <p role="status" className="text-texto-suave">
             Carregando agenda…
           </p>
         ) : (
-          !erro && <ListaDoDia agendamentos={doDia} vazio="Nenhum atendimento neste dia." />
+          !erro && (
+            <ListaDoDia
+              agendamentos={doDia}
+              bloqueios={bloqueiosDoDia(bloqueios, dia)}
+              vazio="Nenhum atendimento neste dia."
+            />
+          )
         )}
       </section>
 

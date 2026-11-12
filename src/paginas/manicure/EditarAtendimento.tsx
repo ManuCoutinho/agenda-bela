@@ -15,6 +15,8 @@ import {
   type DadosAtendimento,
 } from '../../dominio/agenda';
 import { useAgendamento, useOcupados } from '../../hooks/useAgenda';
+import { useBloqueios } from '../../hooks/useBloqueios';
+import { horasRecorrentesNoDia } from '../../dominio/bloqueios';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
@@ -56,7 +58,12 @@ export default function EditarAtendimento() {
   const proprias = new Set(
     (atual?.travas ?? []).filter((t) => t.startsWith(`${data}_`)).map((t) => t.slice(11)),
   );
-  const ocupados = new Set([...ocupadosDoDia].filter((h) => !proprias.has(h)));
+  // bloqueios fixos da semana não têm trava: entram como ocupados aqui
+  const { bloqueios } = useBloqueios();
+  const ocupados = new Set([
+    ...[...ocupadosDoDia].filter((h) => !proprias.has(h)),
+    ...horasRecorrentesNoDia(bloqueios, data),
+  ]);
 
   async function salvar(d: DadosAtendimento) {
     setErroEnvio(undefined);

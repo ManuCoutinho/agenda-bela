@@ -8,11 +8,13 @@ import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
+import { useBloqueios } from '../../hooks/useBloqueios';
 import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
 import EditarAtendimento from './EditarAtendimento';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
+vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamento: vi.fn(), useOcupados: vi.fn() }));
 vi.mock('../../servicos/agenda', () => ({
@@ -74,11 +76,27 @@ describe('EditarAtendimento (RF07)', () => {
       erro: false,
     });
     vi.mocked(useAgendamento).mockReturnValue({ dados: null, carregando: false, erro: false });
+    vi.mocked(useBloqueios).mockReturnValue({ bloqueios: [], carregando: false, erro: false });
     vi.mocked(useOcupados).mockReturnValue({
       dados: new Set(['1000', '1030']),
       carregando: false,
       erro: false,
     });
+  });
+
+  it('bloqueio fixo da semana deixa os horários dele ocupados', async () => {
+    vi.mocked(useBloqueios).mockReturnValue({
+      bloqueios: [
+        { id: 'r1', tipo: 'recorrente', dia: 2, ini: '14:00', fim: '15:00', descricao: 'Terapia' },
+      ],
+      carregando: false,
+      erro: false,
+    });
+    renderizar('/atendimentos/novo?data=2026-12-01'); // terça
+    await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
+    expect(opcao('14:00 (ocupado)').disabled).toBe(true);
+    expect(opcao('13:30 (ocupado)').disabled).toBe(true); // 13:30–14:30 invade a terapia
+    expect(opcao('15:00').disabled).toBe(false);
   });
 
   it('vem com a hora tocada no calendário já escolhida', () => {

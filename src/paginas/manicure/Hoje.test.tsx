@@ -14,6 +14,8 @@ vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
 vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/bloqueios', () => ({ bloquearHorario: vi.fn() }));
+// os pedidos têm o próprio teste (PedidosPendentes.test.tsx)
+vi.mock('./PedidosPendentes', () => ({ default: () => null }));
 
 const ag = (id: string, hora: string, status: Agendamento['status'] = 'marcado'): Agendamento => ({
   id,

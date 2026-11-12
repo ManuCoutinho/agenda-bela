@@ -62,3 +62,19 @@ export type DadosPedido = z.output<typeof esquemaPedido>;
 export const textoAvisoPedido = (p: { nome: string; servico: string; quando: string }) =>
   `Oi! Sou ${p.nome} e acabei de pedir um horário de ${p.servico} para ${p.quando} ` +
   'pela sua página de agendamento. Fico no aguardo da confirmação!';
+
+/** Mensagem da manicure ao aprovar (abre no WhatsApp da cliente). */
+export const textoConfirmacao = (p: {
+  nome: string;
+  servico: string;
+  quando: string;
+  endereco: string;
+}) =>
+  `Oi, ${p.nome}! Seu horário de ${p.servico} está confirmado para ${p.quando}.` +
+  (p.endereco ? ` Endereço: ${p.endereco}.` : '') +
+  ' Até lá!';
+
+/** Mensagem da manicure ao recusar, com o link para a cliente escolher outro horário. */
+export const textoRecusa = (p: { nome: string; quando: string; link: string }) =>
+  `Oi, ${p.nome}! Infelizmente não consigo te atender no horário que você pediu (${p.quando}). ` +
+  `Se quiser, escolha outro horário por aqui: ${p.link}`;

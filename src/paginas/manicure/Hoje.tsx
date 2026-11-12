@@ -12,6 +12,7 @@ import { useAviso } from '../../hooks/useAviso';
 import { useBloqueios } from '../../hooks/useBloqueios';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { bloquearHorario } from '../../servicos/bloqueios';
+import PedidosPendentes from './PedidosPendentes';
 
 export default function Hoje() {
   const agora = new Date();
@@ -58,6 +59,7 @@ export default function Hoje() {
     <>
       <BarraSuperior titulo="Hoje" />
       <p className="mb-4 text-texto-suave first-letter:uppercase">{rotuloDia(hoje)}</p>
+      <PedidosPendentes />
       {carregando ? (
         <p role="status" className="text-texto-suave">
           Carregando agenda…

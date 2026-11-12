@@ -4,6 +4,8 @@ import {
   expiracaoDoPedido,
   pedidoExpirado,
   textoAvisoPedido,
+  textoConfirmacao,
+  textoRecusa,
   VALIDADE_PEDIDO_MS,
 } from './pedidos';
 
@@ -42,5 +44,26 @@ describe('pedidos (RF09, RN02)', () => {
       'Oi! Sou Ana e acabei de pedir um horário de Mão para terça-feira, 1 de dezembro, às 09:00 ' +
         'pela sua página de agendamento. Fico no aguardo da confirmação!',
     );
+  });
+});
+
+describe('mensagens da manicure (RF10)', () => {
+  it('confirmação com e sem endereço', () => {
+    const base = { nome: 'Ana', servico: 'Mão', quando: 'terça-feira, 1 de dezembro, às 09:00' };
+    expect(textoConfirmacao({ ...base, endereco: 'Rua A, 1' })).toBe(
+      'Oi, Ana! Seu horário de Mão está confirmado para terça-feira, 1 de dezembro, às 09:00. ' +
+        'Endereço: Rua A, 1. Até lá!',
+    );
+    expect(textoConfirmacao({ ...base, endereco: '' })).not.toContain('Endereço');
+  });
+
+  it('recusa com o link da página', () => {
+    expect(
+      textoRecusa({
+        nome: 'Ana',
+        quando: 'terça-feira, 1 de dezembro, às 09:00',
+        link: 'https://x/agendar/j',
+      }),
+    ).toContain('escolha outro horário por aqui: https://x/agendar/j');
   });
 });

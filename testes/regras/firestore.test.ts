@@ -8,9 +8,9 @@ import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-const REGRAS = readFileSync('firestore.rules', 'utf8');
-/** O UID vem das próprias regras: trocar o UID na entrega não exige mudar os testes. */
-const MANICURE = /function uidDaManicure\(\) \{\s*return '([^']+)';/.exec(REGRAS)?.[1] ?? '';
+/** As regras geradas por `scripts/gerar-regras.mjs --teste` (o `pnpm test:regras` gera antes). */
+const REGRAS = readFileSync('.firebase/firestore.rules', 'utf8');
+const MANICURE = 'manicure-de-teste';
 const HORA = 3_600_000;
 
 let env: RulesTestEnvironment;
@@ -68,9 +68,10 @@ describe('dados privados (RNF07)', () => {
     await assertFails(db.doc('pedidos/p1').get());
   });
 
-  it('regras têm um UID real, não o texto provisório', () => {
-    expect(MANICURE).toMatch(/^[A-Za-z0-9]{20,128}$/);
-    expect(MANICURE).not.toBe('UID_DA_MANICURE');
+  it('nenhum UID real fica no Git: o modelo só tem o marcador', () => {
+    const modelo = readFileSync('firestore.rules', 'utf8');
+    expect(modelo).toContain("return '__UID_DA_MANICURE__';");
+    expect(REGRAS).toContain(`return '${MANICURE}';`);
   });
 
   it('outra conta Google também não lê clientes', async () => {

@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "test": "vitest run --project dominio",
     "test:watch": "vitest --project dominio",
-    "test:regras": "firebase emulators:exec --only firestore \"vitest run --project regras\""
+    "test:regras": "node scripts/gerar-regras.mjs --teste && firebase emulators:exec --only firestore \"vitest run --project regras\"",
+    "regras:gerar": "node scripts/gerar-regras.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

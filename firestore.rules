@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Desenvolvimento: UID da conta Google de testes da Manu. No teste final, trocar pelo UID
-    // da manicure (Authentication > Usuários) e publicar: firebase deploy --only firestore
+    // O marcador vira o UID da manicure (UID_MANICURE no .env.local) quando as regras
+    // são geradas: scripts/gerar-regras.mjs, que roda antes de firebase deploy --only firestore.
     function uidDaManicure() {
-      return '8NQSmyAg9FauSluuHBuhkPtumsB2';
+      return '__UID_DA_MANICURE__';
     }
 
     function isOwner() {

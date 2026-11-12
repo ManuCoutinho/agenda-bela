@@ -9,6 +9,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // notificação das 18h (RF11): recebe o push do Cloud Messaging e abre /lembretes
+      workbox: { importScripts: ['push-sw.js'] },
       manifest: {
         name: 'Agenda Bela',
         short_name: 'Agenda',

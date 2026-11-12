@@ -74,6 +74,13 @@ describe('dados privados (RNF07)', () => {
     expect(REGRAS).toContain(`return '${MANICURE}';`);
   });
 
+  it('só a manicure lê e grava os celulares que recebem avisos (config/notificacoes)', async () => {
+    const ref = (db: ReturnType<typeof visitante>) => db.doc('config/notificacoes');
+    await assertSucceeds(ref(manicure()).set({ tokens: ['t1'] }));
+    await assertFails(ref(visitante()).get());
+    await assertFails(ref(env.authenticatedContext('outra').firestore()).set({ tokens: ['x'] }));
+  });
+
   it('outra conta Google também não lê clientes', async () => {
     await assertFails(env.authenticatedContext('outra').firestore().doc('clientes/c1').get());
   });

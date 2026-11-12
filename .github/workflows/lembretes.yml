@@ -1,0 +1,26 @@
+name: lembretes
+# RF11 (opção B): todo dia às 18h de São Paulo (21:00 UTC; o GitHub pode atrasar
+# até ~1 h). Também dá para rodar à mão: Actions → lembretes → Run workflow.
+# Repositório sem commits por 60 dias pausa o agendamento: reativar em Actions.
+on:
+  schedule:
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/lembretes.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AGENDA_BELA_BB595 }}

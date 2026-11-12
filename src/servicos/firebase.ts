@@ -7,11 +7,15 @@ import {
   persistentMultipleTabManager,
 } from 'firebase/firestore';
 
-const app = initializeApp({
+const appId: string = import.meta.env.VITE_FIREBASE_APP_ID ?? '';
+
+export const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId,
+  // o número do projeto já vem no appId ("1:<número>:web:…"); o Cloud Messaging precisa dele
+  messagingSenderId: appId.split(':')[1],
 });
 
 export const auth = getAuth(app);

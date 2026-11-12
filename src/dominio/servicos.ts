@@ -25,9 +25,20 @@ const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL
 /** 4500 → "R$ 45,00" */
 export const formatarPreco = (centavos: number) => moeda.format(centavos / 100);
 
-/** 4500 → "45,00" (para preencher o campo) */
-export const precoParaCampo = (centavos: number) =>
-  (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+/** Até R$ 99.999,99 (o mesmo limite de `lerPreco`). */
+const MAX_DIGITOS_PRECO = 7;
+
+/**
+ * Máscara de moeda do campo de preço, como nos apps de banco: só números, que
+ * entram pela direita ("2555" → "R$ 25,55"). Campo vazio continua vazio.
+ */
+export function mascararPreco(texto: string): string {
+  const digitos = texto.replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_DIGITOS_PRECO);
+  return digitos ? formatarPreco(Number(digitos)) : '';
+}
+
+/** 4500 → "R$ 45,00" (para preencher o campo) */
+export const precoParaCampo = (centavos: number) => formatarPreco(centavos);
 
 /** 30 → "30 min", 60 → "1 h", 90 → "1 h 30 min" */
 export function formatarDuracao(minutos: number) {
@@ -49,7 +60,7 @@ export const esquemaServico = z.object({
   preco: z.string().transform((texto, ctx) => {
     const centavos = lerPreco(texto);
     if (centavos === null) {
-      ctx.addIssue({ code: 'custom', message: 'Escreva o preço em reais, por exemplo 45,00.' });
+      ctx.addIssue({ code: 'custom', message: 'Escreva o preço, por exemplo R$ 45,00.' });
       return z.NEVER;
     }
     return centavos;

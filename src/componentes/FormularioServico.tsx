@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import {
   DURACOES_MIN,
   esquemaServico,
   formatarDuracao,
+  mascararPreco,
   type CamposServico,
   type DadosServico,
 } from '../dominio/servicos';
@@ -22,6 +23,7 @@ const VAZIO: CamposServico = { nome: '', duracaoMin: '60', preco: '', publico: t
 export default function FormularioServico({ inicial = VAZIO, aoEnviar, aoCancelar }: Props) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<CamposServico, unknown, DadosServico>({
@@ -47,14 +49,28 @@ export default function FormularioServico({ inicial = VAZIO, aoEnviar, aoCancela
         )}
       </Campo>
 
-      <Campo id="preco" rotulo="Preço (R$)" dica="Ex.: 45,00" erro={errors.preco?.message}>
+      <Campo
+        id="preco"
+        rotulo="Preço"
+        dica="Digite só os números: 4500 vira R$ 45,00."
+        erro={errors.preco?.message}
+      >
         {(a) => (
-          <input
-            {...a}
-            {...register('preco')}
-            type="text"
-            inputMode="decimal"
-            className={ESTILO_CAMPO}
+          <Controller
+            name="preco"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...a}
+                {...field}
+                onChange={(e) => field.onChange(mascararPreco(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="R$ 0,00"
+                className={ESTILO_CAMPO}
+              />
+            )}
           />
         )}
       </Campo>

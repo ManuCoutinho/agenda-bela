@@ -99,6 +99,30 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
     }
   }
 
+  if (pagina.pausa.ativa && !enviado) {
+    return (
+      <Moldura titulo={titulo} endereco={config.endereco}>
+        <section aria-labelledby="pausada" className="flex flex-col gap-4">
+          <h2 id="pausada" className="text-secao font-medium">
+            Agendamentos pausados no momento
+          </h2>
+          <p>{pagina.pausa.aviso || 'Volte em breve para pedir seu horário.'}</p>
+          {config.whatsapp && (
+            <a
+              href={linkWhatsApp(config.whatsapp, 'Oi! Vi que a agenda está pausada. ')}
+              target="_blank"
+              rel="noreferrer"
+              className={ESTILO_BOTAO.secundario}
+            >
+              <Icone nome="conversa" />
+              Falar no WhatsApp
+            </a>
+          )}
+        </section>
+      </Moldura>
+    );
+  }
+
   if (enviado) {
     return (
       <Moldura titulo={titulo}>

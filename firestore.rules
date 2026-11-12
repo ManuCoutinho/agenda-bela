@@ -29,8 +29,15 @@ service cloud.firestore {
         return travas.size() <= i || travaPendente(travas[i]);
       }
 
+      // RF14: com a página pausada, ninguém cria pedido
+      function paginaAberta() {
+        let publico = /databases/$(database)/documents/config/publico;
+        return !exists(publico) || get(publico).data.get('pausa', {}).get('ativa', false) != true;
+      }
+
       allow read, update, delete: if isOwner();
-      allow create: if request.resource.data.keys().hasOnly(
+      allow create: if paginaAberta()
+        && request.resource.data.keys().hasOnly(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
         && request.resource.data.keys().hasAll(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])

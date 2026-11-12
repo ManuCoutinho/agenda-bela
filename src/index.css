@@ -126,6 +126,16 @@ label {
   border-color: var(--color-marcado);
 }
 
+/* bloqueio: cinza (token `bloqueado`); as variáveis só pintam o bloco da semana, não o ponto do mês */
+.calendario .fc .evento-bloqueio {
+  --fc-event-bg-color: var(--color-bloqueado);
+  --fc-event-border-color: var(--color-bloqueado);
+}
+
+.calendario .fc .evento-bloqueio .fc-daygrid-event-dot {
+  border-color: var(--color-bloqueado);
+}
+
 .calendario .fc .fc-event-main,
 .calendario .fc .fc-event-time,
 .calendario .fc .fc-event-title {

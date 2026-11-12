@@ -1,7 +1,16 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TZDate } from '@date-fns/tz';
-import { diaDaSemana, fimDe, FUSO, inicioEm, somarDias, type Agendamento } from './agenda';
+import {
+  diaDaSemana,
+  diasAPartirDe,
+  fimDe,
+  FUSO,
+  inicioEm,
+  somarDias,
+  type Agendamento,
+} from './agenda';
+import { bloqueiosDoDia, type Bloqueio } from './bloqueios';
 
 /** Visões do calendário da manicure. A semana começa no domingo, como no Brasil. */
 export type Visao = 'semana' | 'mes';
@@ -67,7 +76,15 @@ export function lerToque(texto: string): { data: string; hora: string | null } {
   return { data, hora };
 }
 
-export type EventoCalendario = { id: string; titulo: string; inicio: string; fim: string };
+export type TipoEvento = 'atendimento' | 'bloqueio';
+
+export type EventoCalendario = {
+  id: string;
+  tipo: TipoEvento;
+  titulo: string;
+  inicio: string;
+  fim: string;
+};
 
 /** Atendimentos marcados (os cancelados saem) no formato do calendário. */
 export const paraEventos = (agendamentos: readonly Agendamento[]): EventoCalendario[] =>
@@ -75,7 +92,27 @@ export const paraEventos = (agendamentos: readonly Agendamento[]): EventoCalenda
     .filter((a) => a.status === 'marcado')
     .map((a) => ({
       id: a.id,
+      tipo: 'atendimento' as const,
       titulo: `${a.clienteNome} · ${a.servicoNome}`,
       inicio: paraHoraDeParede(a.inicio),
       fim: paraHoraDeParede(fimDe(a)),
     }));
+
+/**
+ * Bloqueios dos `dias` dias a partir de `inicio`: os recorrentes viram um
+ * evento por semana. Vários eventos podem ter o mesmo `id` (o do bloqueio).
+ */
+export const paraEventosDeBloqueio = (
+  bloqueios: readonly Bloqueio[],
+  inicio: string,
+  dias: number,
+): EventoCalendario[] =>
+  diasAPartirDe(inicio, dias).flatMap((data) =>
+    bloqueiosDoDia(bloqueios, data).map((b) => ({
+      id: b.id,
+      tipo: 'bloqueio' as const,
+      titulo: b.descricao ? `Bloqueado · ${b.descricao}` : 'Bloqueado',
+      inicio: `${data}T${b.ini}:00`,
+      fim: `${data}T${b.fim}:00`,
+    })),
+  );

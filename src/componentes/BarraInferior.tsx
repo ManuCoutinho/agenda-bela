@@ -3,7 +3,7 @@ import Icone, { type NomeIcone } from './Icone';
 
 const ABAS: { para: string; rotulo: string; icone: NomeIcone }[] = [
   { para: '/', rotulo: 'Hoje', icone: 'hoje' },
-  { para: '/semana', rotulo: 'Semana', icone: 'semana' },
+  { para: '/agenda', rotulo: 'Agenda', icone: 'semana' },
   { para: '/clientes', rotulo: 'Clientes', icone: 'clientes' },
   { para: '/mais', rotulo: 'Mais', icone: 'mais' },
 ];

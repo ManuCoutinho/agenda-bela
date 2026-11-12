@@ -50,6 +50,7 @@ const PARES: [string, string, number][] = [
   ['livre', 'fundo', TEXTO],
   ['bloqueado', 'fundo', TEXTO],
   ['texto', 'pendente', TEXTO],
+  ['superficie', 'marcado', TEXTO], // atendimento no calendário
   ['borda-campo', 'superficie', COMPONENTE],
   ['borda-campo', 'fundo', COMPONENTE],
   ['marca-decorativa', 'fundo', COMPONENTE],

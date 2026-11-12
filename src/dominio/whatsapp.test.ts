@@ -22,4 +22,16 @@ describe('textoLembrete', () => {
     expect(texto).toContain('Alongamento amanhã (14/10) às 10:00');
     expect(texto).toContain('Endereço: Rua das Flores, 10.');
   });
+
+  it('sem endereço cadastrado, não fala de endereço', () => {
+    const texto = textoLembrete({
+      nome: 'Ana',
+      servico: 'Mão',
+      data: '14/10',
+      hora: '10:00',
+      endereco: '',
+    });
+    expect(texto).not.toContain('Endereço');
+    expect(texto).toMatch(/às 10:00\. Pode confirmar\?$/);
+  });
 });

@@ -27,6 +27,8 @@ export type Agendamento = {
   travas: string[];
   status: StatusAgendamento;
   observacao: string;
+  /** A manicure já tocou em "Enviar lembrete" (RF11). */
+  lembreteEnviado?: boolean;
 };
 
 export type NovoAgendamento = Omit<Agendamento, 'id'>;
@@ -160,3 +162,8 @@ export const esquemaAtendimento = z.object({
 
 export type CamposAtendimento = z.input<typeof esquemaAtendimento>;
 export type DadosAtendimento = z.output<typeof esquemaAtendimento>;
+
+/** RF11: atendimentos marcados para amanhã (São Paulo), em ordem de horário. */
+export function atendimentosDeAmanha(agendamentos: readonly Agendamento[], agora: Date) {
+  return agruparPorDia(agendamentos).get(somarDias(dataDoDia(agora), 1)) ?? [];
+}

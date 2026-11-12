@@ -3,6 +3,8 @@ import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
 import Fab from '../../componentes/Fab';
+import Icone from '../../componentes/Icone';
+import LinkBotao from '../../componentes/LinkBotao';
 import ListaDoDia from '../../componentes/ListaDoDia';
 import { agruparPorDia, dataDoDia, diaDaSemana, rotuloDia } from '../../dominio/agenda';
 import { bloqueiosDoDia, restoDoDia, travasDoIntervalo } from '../../dominio/bloqueios';
@@ -11,6 +13,7 @@ import { useAgendamentos } from '../../hooks/useAgenda';
 import { useAviso } from '../../hooks/useAviso';
 import { useBloqueios } from '../../hooks/useBloqueios';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
+import { useLembretes } from '../../hooks/useLembretes';
 import { bloquearHorario } from '../../servicos/bloqueios';
 import PedidosPendentes from './PedidosPendentes';
 
@@ -20,6 +23,7 @@ export default function Hoje() {
   const { dados, carregando, erro } = useAgendamentos(hoje, 1);
   const { bloqueios } = useBloqueios();
   const { config } = useConfiguracoes();
+  const lembretes = useLembretes();
   const avisoDaNavegacao = useAviso();
   const [avisoLocal, setAvisoLocal] = useState<string>();
   const [confirmando, setConfirmando] = useState(false);
@@ -60,6 +64,25 @@ export default function Hoje() {
       <BarraSuperior titulo="Hoje" />
       <p className="mb-4 text-texto-suave first-letter:uppercase">{rotuloDia(hoje)}</p>
       <PedidosPendentes />
+      {lembretes.pendentes > 0 && (
+        <section
+          aria-label="Lembretes de amanhã"
+          className="mb-6 flex flex-col gap-3 rounded-xl bg-marca-suave p-4"
+        >
+          <p className="text-marca-escura">
+            {lembretes.atendimentos.length === 1
+              ? 'Amanhã você tem 1 atendimento.'
+              : `Amanhã você tem ${lembretes.atendimentos.length} atendimentos.`}{' '}
+            {lembretes.pendentes === 1
+              ? 'Falta 1 lembrete.'
+              : `Faltam ${lembretes.pendentes} lembretes.`}
+          </p>
+          <LinkBotao to="/lembretes">
+            <Icone nome="conversa" />
+            Enviar lembretes
+          </LinkBotao>
+        </section>
+      )}
       {carregando ? (
         <p role="status" className="text-texto-suave">
           Carregando agenda…

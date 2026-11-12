@@ -10,4 +10,5 @@ export const textoLembrete = (a: {
   endereco: string;
 }) =>
   `Oi, ${a.nome}! Passando para lembrar do seu horário de ${a.servico} amanhã (${a.data}) às ${a.hora}. ` +
-  `Endereço: ${a.endereco}. Pode confirmar?`;
+  (a.endereco ? `Endereço: ${a.endereco}. ` : '') +
+  'Pode confirmar?';

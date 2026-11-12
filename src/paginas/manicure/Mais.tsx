@@ -9,6 +9,11 @@ import { useAviso } from '../../hooks/useAviso';
 import { sair } from '../../servicos/autenticacao';
 
 const OPCOES = [
+  {
+    para: '/lembretes',
+    rotulo: 'Lembretes de amanhã',
+    descricao: 'Avisar as clientes pelo WhatsApp',
+  },
   { para: '/mais/servicos', rotulo: 'Serviços', descricao: 'Nome, duração e preço' },
   {
     para: '/mais/bloqueios',

@@ -82,6 +82,11 @@ describe('dados privados (RNF07)', () => {
     await assertSucceeds(manicure().doc('clientes/c1').get());
   });
 
+  it('config/acesso (conferência de login): só a manicure lê', async () => {
+    await assertSucceeds(manicure().doc('config/acesso').get());
+    await assertFails(env.authenticatedContext('outra').firestore().doc('config/acesso').get());
+  });
+
   it('visitante lê só config/publico', async () => {
     await assertSucceeds(visitante().doc('config/publico').get());
     await assertFails(visitante().doc('config/privado').get());

@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router';
+import PaginaNaoEncontrada from './paginas/PaginaNaoEncontrada';
 import Clientes from './paginas/manicure/Clientes';
 import Configuracoes from './paginas/manicure/Configuracoes';
 import EditarAtendimento from './paginas/manicure/EditarAtendimento';
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="mais/servicos/novo" element={<EditarServico />} />
         <Route path="mais/servicos/:id" element={<EditarServico />} />
       </Route>
+      <Route path="*" element={<PaginaNaoEncontrada />} />
     </Routes>
   );
 }

@@ -54,7 +54,7 @@ function renderizar(rota: string) {
       <Routes>
         <Route path="/atendimentos/novo" element={<EditarAtendimento />} />
         <Route path="/atendimentos/:id" element={<EditarAtendimento />} />
-        <Route path="/semana" element={<Destino />} />
+        <Route path="/agenda" element={<Destino />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -81,7 +81,12 @@ describe('EditarAtendimento (RF07)', () => {
     });
   });
 
-  it('marca com as travas do serviço e volta para a semana do dia', async () => {
+  it('vem com a hora tocada no calendário já escolhida', () => {
+    renderizar('/atendimentos/novo?data=2026-12-01&hora=1100');
+    expect(screen.getByLabelText('Horário de início')).toHaveValue('1100');
+  });
+
+  it('marca com as travas do serviço e volta para a agenda no dia', async () => {
     vi.mocked(marcarAtendimento).mockResolvedValue('novo');
     renderizar('/atendimentos/novo?data=2026-12-01');
     await userEvent.selectOptions(screen.getByLabelText('Cliente'), 'Ana');
@@ -107,7 +112,7 @@ describe('EditarAtendimento (RF07)', () => {
     );
     expect(
       await screen.findByText(
-        '/semana?de=2026-12-01 | Ana: terça-feira, 1 de dezembro, às 09:00. Salvo.',
+        '/agenda?dia=2026-12-01 | Ana: terça-feira, 1 de dezembro, às 09:00. Salvo.',
       ),
     ).toBeInTheDocument();
   });

@@ -22,10 +22,13 @@ import { cancelarAtendimento, marcarAtendimento } from '../../servicos/agenda';
 
 const ERRO_CARREGAR = 'Não foi possível carregar os dados. Confira a internet e tente de novo.';
 
-/** Para onde voltar depois de salvar: Hoje, ou a semana que começa no dia marcado. */
-const destino = (data: string) => (data === dataDoDia(new Date()) ? '/' : `/semana?de=${data}`);
+/** Para onde voltar depois de salvar: Hoje, ou a agenda no dia marcado. */
+const destino = (data: string) => (data === dataDoDia(new Date()) ? '/' : `/agenda?dia=${data}`);
 
-/** `/atendimentos/novo?data=AAAA-MM-DD` marca; `/atendimentos/:id` edita ou cancela. */
+/**
+ * `/atendimentos/novo?data=AAAA-MM-DD&hora=HHmm` marca (a hora vem do toque na
+ * grade da semana e é opcional); `/atendimentos/:id` edita ou cancela.
+ */
 export default function EditarAtendimento() {
   const { id } = useParams();
   const [busca] = useSearchParams();
@@ -40,6 +43,7 @@ export default function EditarAtendimento() {
   const dataInicial = atual
     ? dataDoDia(atual.inicio)
     : (busca.get('data') ?? dataDoDia(new Date()));
+  const horaPedida = /^\d{4}$/.test(busca.get('hora') ?? '') ? (busca.get('hora') as string) : '';
   const [dataEscolhida, setDataEscolhida] = useState<string | null>(null);
   const data = dataEscolhida ?? dataInicial;
   const ocupadosDoDia = useOcupados(data).dados;
@@ -184,7 +188,7 @@ export default function EditarAtendimento() {
           clienteId: atual?.clienteId ?? '',
           servicoId: atual?.servicoId ?? '',
           data: dataInicial,
-          hora: atual ? horaDe(atual.inicio) : '',
+          hora: atual ? horaDe(atual.inicio) : horaPedida,
           observacao: atual?.observacao ?? '',
         }}
         ocupados={ocupados}

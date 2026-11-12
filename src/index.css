@@ -62,3 +62,73 @@ textarea,
 label {
   touch-action: manipulation; /* sem atraso de duplo toque */
 }
+
+/*
+ * Calendário (FullCalendar): cores pelos tokens do tema e texto ≥ 16 px.
+ * Pares de contraste conferidos em src/tema.test.ts.
+ */
+.calendario .fc {
+  --fc-border-color: var(--color-borda);
+  --fc-page-bg-color: var(--color-superficie);
+  --fc-neutral-bg-color: var(--color-fundo);
+  --fc-today-bg-color: var(--color-marca-suave);
+  --fc-event-bg-color: var(--color-marcado);
+  --fc-event-border-color: var(--color-marcado);
+  --fc-event-text-color: var(--color-superficie);
+  --fc-now-indicator-color: var(--color-erro);
+  --fc-small-font-size: 1rem;
+  --fc-more-link-text-color: var(--color-marca);
+  font-size: 1rem;
+  background-color: var(--color-superficie);
+}
+
+.calendario .fc a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.calendario .fc .fc-col-header-cell-cushion,
+.calendario .fc .fc-daygrid-day-number {
+  display: inline-flex;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+}
+
+/* dia escolhido: número em destaque (marca), como no Google Agenda */
+.calendario .fc .dia-escolhido .fc-col-header-cell-cushion,
+.calendario .fc .dia-escolhido .fc-daygrid-day-number {
+  background-color: var(--color-marca);
+  color: var(--color-superficie);
+  font-weight: 500;
+}
+
+.calendario .fc .fc-daygrid-day-frame {
+  min-height: 4.5rem; /* célula do mês: alvo de toque confortável */
+}
+
+.calendario .fc .fc-timegrid-slot {
+  height: 1.75rem; /* 2 linhas de 28 px = 56 px por hora */
+}
+
+.calendario .fc .fc-timegrid-slot-label-cushion,
+.calendario .fc .fc-timegrid-axis-cushion {
+  color: var(--color-texto-suave);
+}
+
+.calendario .fc .fc-daygrid-dot-event {
+  color: var(--color-texto);
+}
+
+.calendario .fc .fc-daygrid-event-dot {
+  border-color: var(--color-marcado);
+}
+
+.calendario .fc .fc-event-main,
+.calendario .fc .fc-event-time,
+.calendario .fc .fc-event-title {
+  font-size: 1rem;
+  line-height: 1.25rem;
+}

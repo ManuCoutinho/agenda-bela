@@ -29,7 +29,7 @@ describe('LayoutManicure (RF01)', () => {
     renderizar({ usuario: { uid: 'u1', nome: 'Ju', email: 'ju@x.com' }, carregando: false });
     expect(screen.getByText('Agenda de hoje')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Navegação principal' });
-    expect(nav).toHaveTextContent('HojeSemanaClientesMais');
+    expect(nav).toHaveTextContent('HojeAgendaClientesMais');
   });
 
   it('não redireciona enquanto o login ainda está carregando', () => {

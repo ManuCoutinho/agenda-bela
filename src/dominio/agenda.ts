@@ -68,6 +68,15 @@ export const rotuloHora = (hora: string) => `${hora.slice(0, 2)}:${hora.slice(2)
 export const rotuloDia = (data: string) =>
   format(inicioEm(data, '1200'), "EEEE, d 'de' MMMM", { locale: ptBR });
 
+/** '2026-12-01' → { semana: 'ter', dia: '1 dez' } (botões de dia) */
+export const rotuloDiaCurto = (data: string) => {
+  const d = noFuso(inicioEm(data, '1200'));
+  return {
+    semana: format(d, 'EEEEEE', { locale: ptBR }),
+    dia: format(d, 'd MMM', { locale: ptBR }),
+  };
+};
+
 export const somarDias = (data: string, dias: number) =>
   dataDoDia(addDays(inicioEm(data, '1200'), dias));
 

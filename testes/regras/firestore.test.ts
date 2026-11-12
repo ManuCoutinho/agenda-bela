@@ -183,7 +183,18 @@ describe('pedidos (HU03)', () => {
   it('não aceita início no passado nem além da janela (RN03)', async () => {
     const ids = ['2026-12-01_0900'];
     await assertFails(reservar(ids, pedido(ids, { inicio: daqui(-1) })));
-    await assertFails(reservar(ids, pedido(ids, { inicio: daqui(32 * 24) })));
+    await assertFails(reservar(ids, pedido(ids, { inicio: daqui(93 * 24) })));
+    await assertSucceeds(reservar(ids, pedido(ids, { inicio: daqui(90 * 24) })));
+  });
+
+  it('aceita até 12 blocos (5 h + 1 h de intervalo), não 13', async () => {
+    const blocos = (n: number, dia: string) =>
+      Array.from({ length: n }, (_, i) => {
+        const m = 8 * 60 + i * 30;
+        return `${dia}_${String(Math.floor(m / 60)).padStart(2, '0')}${String(m % 60).padStart(2, '0')}`;
+      });
+    await assertSucceeds(reservar(blocos(12, '2026-12-01')));
+    await assertFails(reservar(blocos(13, '2026-12-02')));
   });
 
   it('visitante não lê pedidos; manicure lê', async () => {

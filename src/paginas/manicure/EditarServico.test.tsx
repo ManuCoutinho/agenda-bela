@@ -62,7 +62,7 @@ describe('Serviços (RF03)', () => {
     renderizar('/mais/servicos/novo');
     await userEvent.type(screen.getByLabelText('Nome do serviço'), 'Pé e mão');
     await userEvent.selectOptions(screen.getByLabelText('Duração'), '1 h');
-    await userEvent.type(screen.getByLabelText('Preço (R$)'), '70');
+    await userEvent.type(screen.getByLabelText('Preço'), '7000');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar serviço' }));
 
     expect(salvarServicos).toHaveBeenCalledWith([
@@ -74,18 +74,24 @@ describe('Serviços (RF03)', () => {
 
   it('edita e tira da página pública', async () => {
     renderizar('/mais/servicos/g1');
-    expect(screen.getByLabelText('Preço (R$)')).toHaveValue('80,00');
+    expect(screen.getByLabelText('Preço')).toHaveValue('R$\u00a080,00');
     await userEvent.click(screen.getByLabelText(/Mostrar na página/));
     await userEvent.click(screen.getByRole('button', { name: 'Salvar serviço' }));
     expect(salvarServicos).toHaveBeenCalledWith([{ ...GEL, publico: false }]);
   });
 
-  it('mostra o erro de preço ligado ao campo', async () => {
+  it('o campo de preço só aceita números e mostra em reais', async () => {
+    renderizar('/mais/servicos/novo');
+    const preco = screen.getByLabelText('Preço');
+    await userEvent.type(preco, 'caro2555');
+    expect(preco).toHaveValue('R$\u00a025,55');
+  });
+
+  it('mostra o erro de preço vazio ligado ao campo', async () => {
     renderizar('/mais/servicos/novo');
     await userEvent.type(screen.getByLabelText('Nome do serviço'), 'Gel');
-    await userEvent.type(screen.getByLabelText('Preço (R$)'), 'caro');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar serviço' }));
-    expect(screen.getByLabelText('Preço (R$)')).toHaveAccessibleDescription(/por exemplo 45,00/);
+    expect(screen.getByLabelText('Preço')).toHaveAccessibleDescription(/por exemplo R\$ 45,00/);
     expect(salvarServicos).not.toHaveBeenCalled();
   });
 });

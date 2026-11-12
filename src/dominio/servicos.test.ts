@@ -5,6 +5,7 @@ import {
   formatarPreco,
   gravarNaLista,
   lerPreco,
+  mascararPreco,
   precoParaCampo,
   servicosPublicos,
   type Servico,
@@ -29,7 +30,25 @@ describe('lerPreco', () => {
 describe('formatação', () => {
   it('mostra preço em reais', () => {
     expect(formatarPreco(4550)).toBe('R$ 45,50');
-    expect(precoParaCampo(4500)).toBe('45,00');
+    expect(precoParaCampo(4500)).toMatch(/^R\$\s45,00$/);
+  });
+
+  it.each([
+    ['2', 'R$ 0,02'],
+    ['2555', 'R$ 25,55'],
+    ['R$ 25,555', 'R$ 255,55'], // digitou mais um número
+    ['R$ 25,5', 'R$ 2,55'], // apagou o último
+    ['0045', 'R$ 0,45'],
+    ['12345678', 'R$ 12.345,67'], // até 7 números
+    ['abc', ''],
+    ['', ''],
+  ])('máscara: %s → %s', (texto, esperado) => {
+    expect(mascararPreco(texto).replace(/\s/g, ' ')).toBe(esperado);
+  });
+
+  it('o valor mascarado volta a centavos', () => {
+    expect(lerPreco(mascararPreco('2555'))).toBe(2555);
+    expect(lerPreco(mascararPreco('12345678'))).toBe(1234567);
   });
 
   it('mostra duração em horas e minutos', () => {

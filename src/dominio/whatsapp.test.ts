@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkWhatsApp, textoLembrete } from './whatsapp';
+import { linkWhatsApp, textoLembrete, textoRemarcacao } from './whatsapp';
 
 describe('linkWhatsApp', () => {
   it('remove a máscara do número e codifica o texto', () => {
@@ -33,5 +33,14 @@ describe('textoLembrete', () => {
     });
     expect(texto).not.toContain('Endereço');
     expect(texto).toMatch(/às 10:00\. Pode confirmar\?$/);
+  });
+});
+
+describe('textoRemarcacao', () => {
+  it('pede para a cliente escolher outro horário', () => {
+    expect(textoRemarcacao({ nome: 'Ana', quando: 'terça-feira, 1 de dezembro, às 10:00' })).toBe(
+      'Oi, Ana! Precisei mudar minha agenda e não vou conseguir te atender terça-feira, 1 de dezembro, às 10:00. ' +
+        'Me diz qual outro dia e horário fica bom para você que eu remarco. Desculpa o transtorno!',
+    );
   });
 });

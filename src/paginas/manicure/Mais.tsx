@@ -31,6 +31,16 @@ const OPCOES = [
     rotulo: 'Configurações',
     descricao: 'Horário de atendimento, link e regras do agendamento',
   },
+  {
+    para: '/mais/exportar',
+    rotulo: 'Exportar para planilha',
+    descricao: 'Clientes e atendimentos em arquivo .csv',
+  },
+  {
+    para: '/mais/instalar',
+    rotulo: 'Instalar o app',
+    descricao: 'Ícone na tela inicial do celular',
+  },
 ];
 
 export default function Mais() {

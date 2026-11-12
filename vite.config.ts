@@ -14,6 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'Agenda Bela',
         short_name: 'Agenda',
+        description: 'Agenda de atendimentos e agendamento online',
         lang: 'pt-BR',
         start_url: '/',
         display: 'standalone',
@@ -22,6 +23,8 @@ export default defineConfig({
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          // o desenho fica dentro da zona segura: serve como ícone adaptável do Android
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
     }),

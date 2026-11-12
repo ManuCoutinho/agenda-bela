@@ -13,6 +13,8 @@ import Hoje from './paginas/manicure/Hoje';
 import ImportarClientes from './paginas/manicure/ImportarClientes';
 import LayoutManicure from './paginas/manicure/LayoutManicure';
 import Lembretes from './paginas/manicure/Lembretes';
+import Exportar from './paginas/manicure/Exportar';
+import Instalar from './paginas/manicure/Instalar';
 import Mais from './paginas/manicure/Mais';
 import Painel from './paginas/manicure/Painel';
 import Servicos from './paginas/manicure/Servicos';
@@ -51,6 +53,8 @@ export default function App() {
         <Route path="clientes/importar" element={<ImportarClientes />} />
         <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
+        <Route path="mais/exportar" element={<Exportar />} />
+        <Route path="mais/instalar" element={<Instalar />} />
         <Route path="mais/painel" element={<Painel />} />
         <Route path="mais/configuracoes" element={<Configuracoes />} />
         <Route path="mais/servicos" element={<Servicos />} />

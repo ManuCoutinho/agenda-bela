@@ -81,24 +81,28 @@ describe('Importar clientes (RF02)', () => {
     expect(await screen.findByText('Clientes: 1 cliente importada.')).toBeInTheDocument();
   });
 
-  it('sem o seletor (fora do Chrome Android), oferece só o arquivo .vcf', async () => {
+  it('sem o seletor (fora do Chrome Android), oferece só o cadastro à mão', () => {
     vi.mocked(temSeletorDeContatos).mockReturnValue(false);
     renderizar();
     expect(screen.queryByRole('button', { name: 'Escolher dos contatos' })).not.toBeInTheDocument();
-
-    const vcf = new File(
-      ['BEGIN:VCARD\nVERSION:3.0\nFN:Eva\nTEL:41 99555-6666\nEND:VCARD\n'],
-      'contatos.vcf',
-      { type: 'text/vcard' },
+    expect(screen.getByText(/use o Chrome no Android/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cadastrar à mão' })).toHaveAttribute(
+      'href',
+      '/clientes/nova',
     );
-    await userEvent.upload(screen.getByLabelText('Abrir arquivo .vcf'), vcf);
-    expect(await screen.findByRole('checkbox', { name: /Eva/ })).toBeChecked();
   });
 
-  it('avisa quando o arquivo não tem contatos', async () => {
+  it('não oferece mais o arquivo .vcf', () => {
     renderizar();
-    const vazio = new File(['nada aqui'], 'x.vcf', { type: 'text/vcard' });
-    await userEvent.upload(screen.getByLabelText('Abrir arquivo .vcf'), vazio);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Esse arquivo não tem contatos');
+    expect(screen.queryByText(/\.vcf/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cadastrar à mão' })).toBeInTheDocument();
+  });
+
+  it('se ela fecha o seletor sem escolher, avisa sem tom de erro', async () => {
+    vi.mocked(escolherContatos).mockResolvedValue([]);
+    renderizar();
+    await userEvent.click(screen.getByRole('button', { name: 'Escolher dos contatos' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Nenhum contato foi escolhido.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

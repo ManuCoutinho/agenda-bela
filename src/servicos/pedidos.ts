@@ -121,7 +121,7 @@ export function observarPedidosPendentes(
  */
 export async function aprovarPedido(
   pedido: Pedido,
-  servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'>,
+  servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number },
   clienteId?: string,
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
@@ -157,6 +157,7 @@ export async function aprovarPedido(
       servicoId: servico.id,
       servicoNome: servico.nome,
       duracaoMin: servico.duracaoMin,
+      ...(servico.precoCentavos === undefined ? {} : { precoCentavos: servico.precoCentavos }),
       inicio: Timestamp.fromDate(pedido.inicio),
       travas: pedido.travas,
       status: 'marcado',

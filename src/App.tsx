@@ -14,6 +14,7 @@ import ImportarClientes from './paginas/manicure/ImportarClientes';
 import LayoutManicure from './paginas/manicure/LayoutManicure';
 import Lembretes from './paginas/manicure/Lembretes';
 import Mais from './paginas/manicure/Mais';
+import Painel from './paginas/manicure/Painel';
 import Servicos from './paginas/manicure/Servicos';
 import Agendar from './paginas/publica/Agendar';
 
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="clientes/importar" element={<ImportarClientes />} />
         <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
+        <Route path="mais/painel" element={<Painel />} />
         <Route path="mais/configuracoes" element={<Configuracoes />} />
         <Route path="mais/servicos" element={<Servicos />} />
         <Route path="mais/servicos/novo" element={<EditarServico />} />

@@ -15,6 +15,11 @@ const OPCOES = [
     rotulo: 'Lembretes de amanhã',
     descricao: 'Avisar as clientes pelo WhatsApp',
   },
+  {
+    para: '/mais/painel',
+    rotulo: 'Painel do mês',
+    descricao: 'Realizados, faltas e quanto entrou',
+  },
   { para: '/mais/servicos', rotulo: 'Serviços', descricao: 'Nome, duração e preço' },
   {
     para: '/mais/bloqueios',

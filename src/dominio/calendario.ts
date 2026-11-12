@@ -86,14 +86,14 @@ export type EventoCalendario = {
   fim: string;
 };
 
-/** Atendimentos marcados (os cancelados saem) no formato do calendário. */
+/** Atendimentos (os cancelados saem) no formato do calendário. */
 export const paraEventos = (agendamentos: readonly Agendamento[]): EventoCalendario[] =>
   agendamentos
-    .filter((a) => a.status === 'marcado')
+    .filter((a) => a.status !== 'cancelado')
     .map((a) => ({
       id: a.id,
       tipo: 'atendimento' as const,
-      titulo: `${a.clienteNome} · ${a.servicoNome}`,
+      titulo: `${a.status === 'falta' ? 'Faltou: ' : ''}${a.clienteNome} · ${a.servicoNome}`,
       inicio: paraHoraDeParede(a.inicio),
       fim: paraHoraDeParede(fimDe(a)),
     }));

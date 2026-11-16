@@ -20,6 +20,10 @@ vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
 vi.mock('../../hooks/usePedidos', () => ({ usePedidosPendentes: vi.fn() }));
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
+vi.mock('../../hooks/usePausa', () => ({
+  usePausa: () => ({ pausa: { ativa: false, aviso: '' }, carregando: false, erro: false }),
+}));
+vi.mock('../../servicos/configPublica', () => ({ salvarPausa: vi.fn() }));
 
 const ANA: Agendamento = {
   id: 'a1',

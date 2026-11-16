@@ -1,43 +1,32 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TZDate } from '@date-fns/tz';
 import {
+  agruparPorDia,
   diaDaSemana,
   diasAPartirDe,
-  fimDe,
-  FUSO,
   inicioEm,
   somarDias,
   type Agendamento,
 } from './agenda';
 import { bloqueiosDoDia, type Bloqueio } from './bloqueios';
 
-/** Visões do calendário da manicure. A semana começa no domingo, como no Brasil. */
-export type Visao = 'semana' | 'mes';
-
-export const lerVisao = (texto: string | null): Visao => (texto === 'mes' ? 'mes' : 'semana');
-
 export const dataValida = (texto: string | null): texto is string =>
   !!texto && /^\d{4}-\d{2}-\d{2}$/.test(texto) && !Number.isNaN(Date.parse(texto));
 
-/** Domingo da semana do dia. */
+/** Domingo da semana do dia: a semana começa no domingo, como no Brasil. */
 export const inicioDaSemana = (dia: string) => somarDias(dia, -diaDaSemana(dia));
 
-const primeiroDoMes = (dia: string) => `${dia.slice(0, 8)}01`;
+export const primeiroDoMes = (dia: string) => `${dia.slice(0, 8)}01`;
 
 /** Primeiro dia do mês `passo` meses depois (ou antes) do mês do dia. */
-function somarMeses(dia: string, passo: number) {
+export function somarMeses(dia: string, passo: number) {
   const [ano, mes] = dia.split('-').map(Number) as [number, number];
   const total = ano * 12 + (mes - 1) + passo;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}-01`;
 }
 
-/**
- * Dias que a visão mostra: a semana (domingo a sábado) ou as semanas inteiras
- * que cobrem o mês (5 ou 6, como na grade do mês).
- */
-export function intervaloDaVisao(visao: Visao, dia: string): { inicio: string; dias: number } {
-  if (visao === 'semana') return { inicio: inicioDaSemana(dia), dias: 7 };
+/** Semanas inteiras (domingo a sábado) que cobrem o mês do dia: 5 ou 6, como na grade. */
+export function intervaloDoMes(dia: string): { inicio: string; dias: number } {
   const inicio = inicioDaSemana(primeiroDoMes(dia));
   const ultimo = somarDias(somarMeses(dia, 1), -1);
   const fim = somarDias(inicioDaSemana(ultimo), 7);
@@ -45,74 +34,52 @@ export function intervaloDaVisao(visao: Visao, dia: string): { inicio: string; d
   return { inicio, dias };
 }
 
-/** Dia escolhido depois de tocar em "anterior"/"próximo". */
-export const passarPeriodo = (visao: Visao, dia: string, passo: 1 | -1) =>
-  visao === 'semana' ? somarDias(dia, 7 * passo) : somarMeses(dia, passo);
-
-const noMeioDoDia = (dia: string) => inicioEm(dia, '1200');
-
-/** 'novembro de 2026' ou '8 – 14 de novembro' / '29 de novembro – 5 de dezembro'. */
-export function tituloDaVisao(visao: Visao, dia: string) {
-  if (visao === 'mes') return format(noMeioDoDia(dia), "MMMM 'de' yyyy", { locale: ptBR });
-  const ini = inicioDaSemana(dia);
-  const fim = somarDias(ini, 6);
-  const mesmoMes = ini.slice(0, 7) === fim.slice(0, 7);
-  const de = format(noMeioDoDia(ini), mesmoMes ? 'd' : "d 'de' MMMM", { locale: ptBR });
-  const ate = format(noMeioDoDia(fim), "d 'de' MMMM", { locale: ptBR });
-  return `${de} – ${ate}`;
+/**
+ * Dia escolhido ao trocar de mês: o mesmo dia do mês, ou o último se o mês
+ * novo for mais curto (31/01 → 28/02).
+ */
+export function passarMes(dia: string, passo: number) {
+  const primeiro = somarMeses(dia, passo);
+  const ultimo = Number(somarDias(somarMeses(primeiro, 1), -1).slice(8));
+  const d = Math.min(Number(dia.slice(8)), ultimo);
+  return `${primeiro.slice(0, 8)}${String(d).padStart(2, '0')}`;
 }
 
-/**
- * O FullCalendar roda em UTC e recebe a hora de parede de São Paulo como se
- * fosse UTC: assim o calendário mostra a hora de lá em qualquer celular, sem
- * plugin de fuso. Ex.: 12:30 em São Paulo → '2026-11-12T12:30:00'.
- */
-export const paraHoraDeParede = (d: Date) => format(new TZDate(d, FUSO), "yyyy-MM-dd'T'HH:mm:ss");
+/** 'Novembro' e '2026'. */
+export const tituloDoMes = (dia: string) => ({
+  mes: format(inicioEm(primeiroDoMes(dia), '1200'), 'LLLL', { locale: ptBR }).replace(/^./, (l) =>
+    l.toUpperCase(),
+  ),
+  ano: dia.slice(0, 4),
+});
 
-/** Toque no calendário: '2026-11-12' (dia) ou '2026-11-12T14:30:00Z' (horário). */
-export function lerToque(texto: string): { data: string; hora: string | null } {
-  const data = texto.slice(0, 10);
-  const hora = texto.length > 10 ? `${texto.slice(11, 13)}${texto.slice(14, 16)}` : null;
-  return { data, hora };
+/**
+ * O seletor de datas trabalha com `Date` no fuso do aparelho. Ao meio-dia
+ * local, o dia do calendário é o mesmo da string AAAA-MM-DD em qualquer fuso.
+ */
+export function paraDataLocal(dia: string) {
+  const [ano, mes, d] = dia.split('-').map(Number) as [number, number, number];
+  return new Date(ano, mes - 1, d, 12);
 }
 
-export type TipoEvento = 'atendimento' | 'bloqueio';
+export const deDataLocal = (d: Date) => format(d, 'yyyy-MM-dd');
 
-export type EventoCalendario = {
-  id: string;
-  tipo: TipoEvento;
-  titulo: string;
-  inicio: string;
-  fim: string;
-};
+/** O que o dia tem, para os marcadores embaixo do número. */
+export type MarcasDoDia = { atendimentos: number; bloqueios: number };
 
-/** Atendimentos (os cancelados saem) no formato do calendário. */
-export const paraEventos = (agendamentos: readonly Agendamento[]): EventoCalendario[] =>
-  agendamentos
-    .filter((a) => a.status !== 'cancelado')
-    .map((a) => ({
-      id: a.id,
-      tipo: 'atendimento' as const,
-      titulo: `${a.status === 'falta' ? 'Faltou: ' : ''}${a.clienteNome} · ${a.servicoNome}`,
-      inicio: paraHoraDeParede(a.inicio),
-      fim: paraHoraDeParede(fimDe(a)),
-    }));
-
-/**
- * Bloqueios dos `dias` dias a partir de `inicio`: os recorrentes viram um
- * evento por semana. Vários eventos podem ter o mesmo `id` (o do bloqueio).
- */
-export const paraEventosDeBloqueio = (
+/** Marcas dos `dias` dias a partir de `inicio`; dias sem nada ficam de fora. */
+export function marcasPorDia(
+  agendamentos: readonly Agendamento[],
   bloqueios: readonly Bloqueio[],
   inicio: string,
   dias: number,
-): EventoCalendario[] =>
-  diasAPartirDe(inicio, dias).flatMap((data) =>
-    bloqueiosDoDia(bloqueios, data).map((b) => ({
-      id: b.id,
-      tipo: 'bloqueio' as const,
-      titulo: b.descricao ? `Bloqueado · ${b.descricao}` : 'Bloqueado',
-      inicio: `${data}T${b.ini}:00`,
-      fim: `${data}T${b.fim}:00`,
-    })),
-  );
+): Map<string, MarcasDoDia> {
+  const porDia = agruparPorDia(agendamentos);
+  const marcas = new Map<string, MarcasDoDia>();
+  for (const dia of diasAPartirDe(inicio, dias)) {
+    const atendimentos = porDia.get(dia)?.length ?? 0;
+    const qtdBloqueios = bloqueiosDoDia(bloqueios, dia).length;
+    if (atendimentos || qtdBloqueios) marcas.set(dia, { atendimentos, bloqueios: qtdBloqueios });
+  }
+  return marcas;
+}

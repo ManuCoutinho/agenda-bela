@@ -4,7 +4,13 @@ import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
 import FormularioPedido from '../../componentes/FormularioPedido';
 import Icone from '../../componentes/Icone';
-import { ESTILO_BOTAO, ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
+import Carregando from '../../componentes/Carregando';
+import {
+  ESTILO_BOTAO,
+  ESTILO_FOLHA,
+  ESTILO_ITEM_LISTA,
+  ESTILO_LISTA,
+} from '../../componentes/estilos';
 import { idsTravas, inicioEm, rotuloDia, rotuloDiaCurto, rotuloHora } from '../../dominio/agenda';
 import { diasAbertos, type RegrasHorario } from '../../dominio/horariosLivres';
 import { HorarioJaPedido, textoAvisoPedido, type DadosPedido } from '../../dominio/pedidos';
@@ -27,15 +33,11 @@ export default function Agendar() {
   const { pagina, carregando, erro } = usePaginaPublica();
 
   if (carregando) {
-    return (
-      <p role="status" className="p-6 text-center text-texto-suave">
-        Carregando agenda…
-      </p>
-    );
+    return <Carregando texto="Carregando agenda…" telaCheia />;
   }
   if (erro) {
     return (
-      <p role="alert" className="p-6 text-center text-erro">
+      <p role="alert" className="m-4 rounded-3xl bg-fundo p-6 text-center text-erro">
         Não foi possível abrir a agenda. Confira a internet e tente de novo.
       </p>
     );
@@ -294,7 +296,7 @@ function Moldura({
   children: ReactNode;
 }) {
   return (
-    <main className="mx-auto max-w-md px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+    <main className={`${ESTILO_FOLHA} pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
       <BarraSuperior titulo={titulo} voltarPara={voltarPara} />
       {endereco && <p className="mb-4 text-texto-suave">{endereco}</p>}
       {children}

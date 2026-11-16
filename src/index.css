@@ -1,9 +1,10 @@
 @import 'tailwindcss';
 
 /*
- * Paleta do Espaço Juju (cartão de visita), ajustada para WCAG AA.
- * O rosa original do logo (#c9637b) tem só 3,6:1 sobre o fundo: fica para
- * decoração e bordas. Texto e botões usam `marca`, o mesmo tom escurecido.
+ * Paleta do Happy Hues nº 7 (happyhues.co/palettes/7), com o rosa do Espaço
+ * Juju (#c9637b) no lugar do fundo rosa-claro. O rosa é a moldura do app
+ * (barra superior e laterais): sobre ele só vai texto na cor `texto` (4,7:1).
+ * O conteúdo fica numa folha clara (`fundo`), onde todos os pares passam no AA.
  * Os contrastes mínimos são conferidos em `src/tema.test.ts`: ao trocar uma
  * cor aqui, rode `pnpm test`.
  *
@@ -21,19 +22,20 @@
   --text-secao--line-height: 1.5rem;
 
   /* marca */
-  --color-marca: #a8445e; /* texto, links, botão com texto branco (5,5:1) */
-  --color-marca-escura: #7d2e44; /* pressionado; texto sobre marca-suave */
-  --color-marca-decorativa: #c9637b; /* rosa do logo: só enfeite, nunca texto */
-  --color-marca-suave: #f8e4e9; /* indicador da aba ativa, FAB, selecionado */
+  --color-moldura: #c9637b; /* rosa do Espaço Juju: fundo do app e barra superior */
+  --color-marca: #0e172c; /* botão principal, links, foco, FAB */
+  --color-marca-escura: #2b3550; /* botão pressionado; ícone sobre marca-suave */
+  --color-marca-decorativa: #8a63d2; /* lilás da paleta: pontos do calendário, enfeite */
+  --color-marca-suave: #d9d4e7; /* indicador da aba ativa, selecionado */
 
   /* superfícies e texto */
-  --color-fundo: #fef9f6; /* creme do cartão; barra superior */
-  --color-superficie: #ffffff; /* cartões, listas, campos */
-  --color-container: #f6ebee; /* barra de navegação inferior (surface container) */
-  --color-texto: #2e2629; /* também fundo do snackbar (inverse surface) */
-  --color-texto-suave: #6b4f57; /* texto secundário (7:1) */
-  --color-borda: #ecd9de; /* divisórias decorativas */
-  --color-borda-campo: #9b7f87; /* contorno de campo: 3:1 exigido p/ componentes */
+  --color-fundo: #f9f8fc; /* folha do conteúdo */
+  --color-superficie: #fffffe; /* cartões, listas, campos */
+  --color-container: #eeebf5; /* barra de navegação inferior (surface container) */
+  --color-texto: #0e172c; /* também fundo do snackbar (inverse surface) */
+  --color-texto-suave: #4a5170; /* texto secundário */
+  --color-borda: #e4e0ee; /* divisórias decorativas */
+  --color-borda-campo: #7a7f96; /* contorno de campo: 3:1 exigido p/ componentes */
   --color-erro: #b3261e;
 
   /* estados da agenda (sempre acompanhados de texto, nunca só a cor) */
@@ -41,6 +43,15 @@
   --color-livre: #2e7d32;
   --color-bloqueado: #6e6266;
   --color-pendente: #f9a825; /* fundo, com texto na cor `texto` */
+
+  /* calendário: o mês novo entra deslizando */
+  --animate-entrar: entrar 200ms ease-out;
+  @keyframes entrar {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }
 
 html {
@@ -49,7 +60,7 @@ html {
 }
 
 body {
-  background-color: var(--color-fundo);
+  background-color: var(--color-moldura);
   color: var(--color-texto);
   overscroll-behavior-y: none;
 }
@@ -63,82 +74,8 @@ label {
   touch-action: manipulation; /* sem atraso de duplo toque */
 }
 
-/*
- * Calendário (FullCalendar): cores pelos tokens do tema e texto ≥ 16 px.
- * Pares de contraste conferidos em src/tema.test.ts.
- */
-.calendario .fc {
-  --fc-border-color: var(--color-borda);
-  --fc-page-bg-color: var(--color-superficie);
-  --fc-neutral-bg-color: var(--color-fundo);
-  --fc-today-bg-color: var(--color-marca-suave);
-  --fc-event-bg-color: var(--color-marcado);
-  --fc-event-border-color: var(--color-marcado);
-  --fc-event-text-color: var(--color-superficie);
-  --fc-now-indicator-color: var(--color-erro);
-  --fc-small-font-size: 1rem;
-  --fc-more-link-text-color: var(--color-marca);
-  font-size: 1rem;
-  background-color: var(--color-superficie);
-}
-
-.calendario .fc a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.calendario .fc .fc-col-header-cell-cushion,
-.calendario .fc .fc-daygrid-day-number {
-  display: inline-flex;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-}
-
-/* dia escolhido: número em destaque (marca), como no Google Agenda */
-.calendario .fc .dia-escolhido .fc-col-header-cell-cushion,
-.calendario .fc .dia-escolhido .fc-daygrid-day-number {
-  background-color: var(--color-marca);
-  color: var(--color-superficie);
-  font-weight: 500;
-}
-
-.calendario .fc .fc-daygrid-day-frame {
-  min-height: 4.5rem; /* célula do mês: alvo de toque confortável */
-}
-
-.calendario .fc .fc-timegrid-slot {
-  height: 1.75rem; /* 2 linhas de 28 px = 56 px por hora */
-}
-
-.calendario .fc .fc-timegrid-slot-label-cushion,
-.calendario .fc .fc-timegrid-axis-cushion {
-  color: var(--color-texto-suave);
-}
-
-.calendario .fc .fc-daygrid-dot-event {
-  color: var(--color-texto);
-}
-
-.calendario .fc .fc-daygrid-event-dot {
-  border-color: var(--color-marcado);
-}
-
-/* bloqueio: cinza (token `bloqueado`); as variáveis só pintam o bloco da semana, não o ponto do mês */
-.calendario .fc .evento-bloqueio {
-  --fc-event-bg-color: var(--color-bloqueado);
-  --fc-event-border-color: var(--color-bloqueado);
-}
-
-.calendario .fc .evento-bloqueio .fc-daygrid-event-dot {
-  border-color: var(--color-bloqueado);
-}
-
-.calendario .fc .fc-event-main,
-.calendario .fc .fc-event-time,
-.calendario .fc .fc-event-title {
-  font-size: 1rem;
-  line-height: 1.25rem;
+@media (prefers-reduced-motion: reduce) {
+  .animate-entrar {
+    animation: none;
+  }
 }

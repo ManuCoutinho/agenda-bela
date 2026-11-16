@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type Calendario from '../../componentes/Calendario';
@@ -12,14 +12,13 @@ import Agenda from './Agenda';
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
 vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 
-// O FullCalendar precisa de layout real; aqui só conferimos o que a tela passa
-// para ele e o que ela faz com os toques.
+// A grade do mês tem teste próprio; aqui só o que a tela passa para ela.
 type PropsCalendario = ComponentProps<typeof Calendario>;
 let ultimo: PropsCalendario;
 vi.mock('../../componentes/Calendario', () => ({
   default: (props: PropsCalendario) => {
     ultimo = props;
-    return <p>{`calendário ${props.visao} ${props.dia} (${props.eventos.length})`}</p>;
+    return <p>{`calendário ${props.dia} (${props.marcas.size} dias marcados)`}</p>;
   },
 }));
 
@@ -37,18 +36,11 @@ const ANA: Agendamento = {
   observacao: '',
 };
 
-function Onde() {
-  const l = useLocation();
-  return <p>{`em ${l.pathname}${l.search}`}</p>;
-}
-
 function renderizar(rota = '/agenda') {
   return render(
     <MemoryRouter initialEntries={[rota]}>
       <Routes>
         <Route path="/agenda" element={<Agenda />} />
-        <Route path="/atendimentos/*" element={<Onde />} />
-        <Route path="/mais/bloqueios/*" element={<Onde />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -71,11 +63,12 @@ describe('Agenda (RF07)', () => {
     vi.useRealTimers();
   });
 
-  it('abre na semana de hoje e mostra os atendimentos do dia', () => {
+  it('abre no mês de hoje e mostra os atendimentos do dia', () => {
     renderizar();
-    expect(screen.getByText('calendário semana 2026-11-12 (2)')).toBeInTheDocument();
-    expect(useAgendamentos).toHaveBeenCalledWith('2026-11-08', 7);
-    expect(screen.getByRole('heading', { name: '8 – 14 de novembro' })).toBeInTheDocument();
+    // Ana no dia 12 + terapia às quintas da grade (5, 12, 19, 26 e 3/12)
+    expect(screen.getByText('calendário 2026-11-12 (5 dias marcados)')).toBeInTheDocument();
+    expect(useAgendamentos).toHaveBeenCalledWith('2026-11-01', 35);
+    expect(screen.getByRole('heading', { name: 'Novembro 2026' })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /Hoje, quinta-feira, 12 de novembro/ }),
     ).toBeInTheDocument();
@@ -84,25 +77,27 @@ describe('Agenda (RF07)', () => {
       'href',
       '/atendimentos/novo?data=2026-11-12',
     );
+    expect(screen.queryByRole('button', { name: 'Hoje' })).not.toBeInTheDocument();
   });
 
-  it('troca para o mês e anda para o próximo', async () => {
+  it('anda para o próximo mês e volta para hoje', async () => {
     renderizar();
-    await userEvent.click(screen.getByRole('button', { name: 'Mês' }));
-    expect(screen.getByRole('button', { name: 'Mês' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('heading', { name: 'novembro de 2026' })).toBeInTheDocument();
-    expect(useAgendamentos).toHaveBeenLastCalledWith('2026-11-01', 35);
-
     await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
-    expect(screen.getByRole('heading', { name: 'dezembro de 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dezembro 2026' })).toBeInTheDocument();
+    expect(useAgendamentos).toHaveBeenLastCalledWith('2026-11-29', 35);
     await userEvent.click(screen.getByRole('button', { name: 'Hoje' }));
-    expect(screen.getByRole('heading', { name: 'novembro de 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Novembro 2026' })).toBeInTheDocument();
+  });
+
+  it('deslizar troca de mês', async () => {
+    renderizar();
+    ultimo.aoTrocarMes(-1);
+    expect(await screen.findByRole('heading', { name: 'Outubro 2026' })).toBeInTheDocument();
   });
 
   it('tocar num dia mostra a lista dele e o botão marca nesse dia', async () => {
-    vi.mocked(useAgendamentos).mockReturnValue({ dados: [ANA], carregando: false, erro: false });
-    renderizar('/agenda?visao=mes&dia=2026-11-12');
-    ultimo.aoTocarDia('2026-11-20');
+    renderizar('/agenda?dia=2026-11-12');
+    ultimo.aoEscolherDia('2026-11-20');
     expect(
       await screen.findByRole('heading', { name: 'sexta-feira, 20 de novembro' }),
     ).toBeInTheDocument();
@@ -113,21 +108,7 @@ describe('Agenda (RF07)', () => {
     );
   });
 
-  it('tocar num horário abre "Novo atendimento" com dia e hora', async () => {
-    renderizar();
-    ultimo.aoTocarHorario('2026-11-13', '1030');
-    expect(
-      await screen.findByText('em /atendimentos/novo?data=2026-11-13&hora=1030'),
-    ).toBeInTheDocument();
-  });
-
-  it('tocar num atendimento abre para editar', async () => {
-    renderizar();
-    ultimo.aoTocarEvento('a1', 'atendimento');
-    expect(await screen.findByText('em /atendimentos/a1')).toBeInTheDocument();
-  });
-
-  it('bloqueios aparecem na lista do dia e abrem ao tocar', async () => {
+  it('bloqueios aparecem na lista do dia e abrem ao tocar', () => {
     renderizar();
     expect(screen.getByRole('link', { name: /Bloqueado \(toda semana\)/ })).toHaveAttribute(
       'href',
@@ -137,8 +118,6 @@ describe('Agenda (RF07)', () => {
       'href',
       '/mais/bloqueios/novo?data=2026-11-12',
     );
-    ultimo.aoTocarEvento('r1', 'bloqueio');
-    expect(await screen.findByText('em /mais/bloqueios/r1')).toBeInTheDocument();
   });
 
   it('avisa quando a agenda não carrega', () => {

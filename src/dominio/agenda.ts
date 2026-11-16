@@ -2,6 +2,7 @@ import { TZDate } from '@date-fns/tz';
 import { addDays, addMinutes, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
+import { esquemaCliente } from './clientes';
 import { blocosNecessarios, hhmm, PASSO, type Faixa } from './disponibilidade';
 
 export const FUSO = 'America/Sao_Paulo';
@@ -155,13 +156,46 @@ export function agruparPorDia(agendamentos: readonly Agendamento[]) {
   return porDia;
 }
 
-export const esquemaAtendimento = z.object({
-  clienteId: z.string().min(1, 'Escolha a cliente.'),
-  servicoId: z.string().min(1, 'Escolha o serviço.'),
-  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Escolha o dia.'),
-  hora: z.string().regex(/^\d{4}$/, 'Escolha o horário.'),
-  observacao: z.string().trim().max(500, 'Use até 500 letras na observação.'),
-});
+/** Valor do campo "Cliente" que abre o cadastro da cliente no próprio atendimento. */
+export const NOVA_CLIENTE = 'nova';
+
+const CAMPO_NOVA: Record<string, string> = {
+  nome: 'novaNome',
+  whatsapp: 'novaWhatsapp',
+  consentimento: 'novaConsentimento',
+};
+
+export const esquemaAtendimento = z
+  .object({
+    clienteId: z.string().min(1, 'Escolha a cliente.'),
+    novaNome: z.string().default(''),
+    novaWhatsapp: z.string().default(''),
+    novaConsentimento: z.boolean().default(false),
+    servicoId: z.string().min(1, 'Escolha o serviço.'),
+    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Escolha o dia.'),
+    hora: z.string().regex(/^\d{4}$/, 'Escolha o horário.'),
+    observacao: z.string().trim().max(500, 'Use até 500 letras na observação.'),
+  })
+  .transform(({ novaNome, novaWhatsapp, novaConsentimento, ...resto }, ctx) => {
+    if (resto.clienteId !== NOVA_CLIENTE) return { ...resto, novaCliente: null };
+    const nova = esquemaCliente.safeParse({
+      nome: novaNome,
+      whatsapp: novaWhatsapp,
+      observacao: '',
+      consentimento: novaConsentimento,
+    });
+    if (!nova.success) {
+      for (const issue of nova.error.issues) {
+        ctx.addIssue({
+          code: 'custom',
+          message: issue.message,
+          path: [CAMPO_NOVA[String(issue.path[0])] ?? 'novaNome'],
+        });
+      }
+      return z.NEVER;
+    }
+    return { ...resto, novaCliente: nova.data };
+  });
 
 export type CamposAtendimento = z.input<typeof esquemaAtendimento>;
 export type DadosAtendimento = z.output<typeof esquemaAtendimento>;

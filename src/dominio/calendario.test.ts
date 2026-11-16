@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { inicioEm, type Agendamento } from './agenda';
 import {
   dataValida,
+  deDataLocal,
   inicioDaSemana,
-  intervaloDaVisao,
-  lerToque,
-  lerVisao,
-  paraEventos,
-  paraEventosDeBloqueio,
-  paraHoraDeParede,
-  passarPeriodo,
-  tituloDaVisao,
+  intervaloDoMes,
+  marcasPorDia,
+  paraDataLocal,
+  passarMes,
+  tituloDoMes,
 } from './calendario';
 
 const atendimento = (extra: Partial<Agendamento> = {}): Agendamento => ({
@@ -28,76 +26,54 @@ const atendimento = (extra: Partial<Agendamento> = {}): Agendamento => ({
   ...extra,
 });
 
-describe('visão do calendário', () => {
-  it('lê a visão e a data do endereço', () => {
-    expect(lerVisao('mes')).toBe('mes');
-    expect(lerVisao(null)).toBe('semana');
-    expect(lerVisao('ano')).toBe('semana');
+describe('calendário do mês', () => {
+  it('lê a data do endereço', () => {
     expect(dataValida('2026-11-12')).toBe(true);
     expect(dataValida('2026-13-40')).toBe(false);
     expect(dataValida('ontem')).toBe(false);
+    expect(dataValida(null)).toBe(false);
   });
 
   it('a semana começa no domingo', () => {
     expect(inicioDaSemana('2026-11-12')).toBe('2026-11-08'); // quinta → domingo
     expect(inicioDaSemana('2026-11-08')).toBe('2026-11-08');
-    expect(intervaloDaVisao('semana', '2026-11-14')).toEqual({ inicio: '2026-11-08', dias: 7 });
   });
 
   it('o mês cobre semanas inteiras', () => {
     // novembro/2026: 1º é domingo, 30 é segunda → 5 semanas
-    expect(intervaloDaVisao('mes', '2026-11-12')).toEqual({ inicio: '2026-11-01', dias: 35 });
+    expect(intervaloDoMes('2026-11-12')).toEqual({ inicio: '2026-11-01', dias: 35 });
     // agosto/2026: 1º é sábado → começa em 26/07, 6 semanas
-    expect(intervaloDaVisao('mes', '2026-08-20')).toEqual({ inicio: '2026-07-26', dias: 42 });
+    expect(intervaloDoMes('2026-08-20')).toEqual({ inicio: '2026-07-26', dias: 42 });
   });
 
-  it('anterior/próximo anda uma semana ou um mês', () => {
-    expect(passarPeriodo('semana', '2026-11-12', 1)).toBe('2026-11-19');
-    expect(passarPeriodo('mes', '2026-11-12', 1)).toBe('2026-12-01');
-    expect(passarPeriodo('mes', '2026-01-31', -1)).toBe('2025-12-01');
-    expect(passarPeriodo('mes', '2026-12-05', 1)).toBe('2027-01-01');
+  it('trocar de mês mantém o dia, ou vai para o último do mês mais curto', () => {
+    expect(passarMes('2026-11-12', 1)).toBe('2026-12-12');
+    expect(passarMes('2026-12-05', 1)).toBe('2027-01-05');
+    expect(passarMes('2026-01-31', 1)).toBe('2026-02-28');
+    expect(passarMes('2026-03-31', -1)).toBe('2026-02-28');
   });
 
-  it('título da visão em português', () => {
-    expect(tituloDaVisao('mes', '2026-11-12')).toBe('novembro de 2026');
-    expect(tituloDaVisao('semana', '2026-11-12')).toBe('8 – 14 de novembro');
-    expect(tituloDaVisao('semana', '2026-12-01')).toBe('29 de novembro – 5 de dezembro');
-  });
-});
-
-describe('conversão para o FullCalendar', () => {
-  it('usa a hora de parede de São Paulo', () => {
-    expect(paraHoraDeParede(new Date('2026-11-12T17:30:00Z'))).toBe('2026-11-12T14:30:00');
+  it('título com o mês em português e o ano', () => {
+    expect(tituloDoMes('2026-11-12')).toEqual({ mes: 'Novembro', ano: '2026' });
+    expect(tituloDoMes('2027-03-01')).toEqual({ mes: 'Março', ano: '2027' });
   });
 
-  it('lê o toque em dia ou em horário', () => {
-    expect(lerToque('2026-11-12')).toEqual({ data: '2026-11-12', hora: null });
-    expect(lerToque('2026-11-12T14:30:00Z')).toEqual({ data: '2026-11-12', hora: '1430' });
-  });
-
-  it('mostra só os marcados, com cliente, serviço e fim pela duração', () => {
-    const eventos = paraEventos([atendimento(), atendimento({ id: 'a2', status: 'cancelado' })]);
-    expect(eventos).toEqual([
-      {
-        id: 'a1',
-        tipo: 'atendimento',
-        titulo: 'Ana · Mão',
-        inicio: '2026-11-12T14:30:00',
-        fim: '2026-11-12T16:00:00',
-      },
-    ]);
+  it('converte o dia para a data do seletor e de volta', () => {
+    expect(deDataLocal(paraDataLocal('2026-11-12'))).toBe('2026-11-12');
+    expect(paraDataLocal('2026-02-01').getMonth()).toBe(1);
   });
 });
 
-describe('bloqueios no calendário', () => {
-  it('recorrente aparece em toda semana do período; pontual só no dia', () => {
-    const eventos = paraEventosDeBloqueio(
+describe('marcas por dia', () => {
+  it('conta atendimentos (sem cancelados) e bloqueios; recorrente vale toda semana', () => {
+    const marcas = marcasPorDia(
+      [atendimento(), atendimento({ id: 'a2', status: 'cancelado' })],
       [
-        { id: 'r1', tipo: 'recorrente', dia: 2, ini: '14:00', fim: '15:00', descricao: 'Terapia' },
+        { id: 'r1', tipo: 'recorrente', dia: 2, ini: '14:00', fim: '15:00', descricao: '' },
         {
           id: 'p1',
           tipo: 'pontual',
-          data: '2026-11-13',
+          data: '2026-11-12',
           ini: '09:00',
           fim: '10:00',
           descricao: '',
@@ -107,22 +83,9 @@ describe('bloqueios no calendário', () => {
       '2026-11-08',
       14,
     );
-    expect(eventos).toEqual([
-      {
-        id: 'r1',
-        tipo: 'bloqueio',
-        titulo: 'Bloqueado · Terapia',
-        inicio: '2026-11-10T14:00:00',
-        fim: '2026-11-10T15:00:00',
-      },
-      {
-        id: 'p1',
-        tipo: 'bloqueio',
-        titulo: 'Bloqueado',
-        inicio: '2026-11-13T09:00:00',
-        fim: '2026-11-13T10:00:00',
-      },
-      expect.objectContaining({ id: 'r1', inicio: '2026-11-17T14:00:00' }),
-    ]);
+    expect(marcas.get('2026-11-12')).toEqual({ atendimentos: 1, bloqueios: 1 });
+    expect(marcas.get('2026-11-10')).toEqual({ atendimentos: 0, bloqueios: 1 });
+    expect(marcas.get('2026-11-17')).toEqual({ atendimentos: 0, bloqueios: 1 });
+    expect(marcas.has('2026-11-11')).toBe(false);
   });
 });

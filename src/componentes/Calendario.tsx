@@ -1,105 +1,119 @@
-import ptBr from '@fullcalendar/core/locales/pt-br';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import { useEffect, useRef } from 'react';
-import {
-  lerToque,
-  type EventoCalendario,
-  type TipoEvento,
-  type Visao,
-} from '../dominio/calendario';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { createContext, use, useEffect, useRef, type TouchEvent } from 'react';
+import { DayPicker, type DayButtonProps } from 'react-day-picker';
+import { deDataLocal, paraDataLocal, primeiroDoMes, type MarcasDoDia } from '../dominio/calendario';
 
 type Props = {
-  visao: Visao;
-  /** Dia escolhido (AAAA-MM-DD): o calendário vai até ele e o destaca. */
+  /** Dia escolhido (AAAA-MM-DD); o calendário mostra o mês dele. */
   dia: string;
-  eventos: readonly EventoCalendario[];
-  /** Agora em São Paulo, na hora de parede (ver `paraHoraDeParede`). */
-  agora: string;
-  aoTocarDia: (data: string) => void;
-  aoTocarHorario: (data: string, hora: string) => void;
-  aoTocarEvento: (id: string, tipo: TipoEvento) => void;
+  hoje: string;
+  marcas: ReadonlyMap<string, MarcasDoDia>;
+  aoEscolherDia: (dia: string) => void;
+  /** Deslizar para o lado: -1 mês anterior, 1 próximo. */
+  aoTrocarMes: (passo: 1 | -1) => void;
 };
 
-const VIEW: Record<Visao, string> = { semana: 'timeGridWeek', mes: 'dayGridMonth' };
-const diaDe = (d: Date) => d.toISOString().slice(0, 10);
+const ContextoMarcas = createContext<ReadonlyMap<string, MarcasDoDia>>(new Map());
 
-/**
- * Calendário da manicure (FullCalendar, MIT). Roda em UTC com a hora de parede
- * de São Paulo; a barra de navegação fica na tela, não aqui.
- */
-export default function Calendario({
-  visao,
-  dia,
-  eventos,
-  agora,
-  aoTocarDia,
-  aoTocarHorario,
-  aoTocarEvento,
-}: Props) {
-  const ref = useRef<FullCalendar>(null);
+const DESLIZE_MIN_PX = 50;
 
+const plural = (n: number, palavra: string) => `${n} ${palavra}${n > 1 ? 's' : ''}`;
+
+function rotuloDoDia(data: Date, marcas: MarcasDoDia | undefined, hoje: boolean) {
+  const partes = [format(data, "EEEE, d 'de' MMMM", { locale: ptBR })];
+  if (hoje) partes.push('hoje');
+  if (marcas?.atendimentos) partes.push(plural(marcas.atendimentos, 'atendimento'));
+  if (marcas?.bloqueios) partes.push(plural(marcas.bloqueios, 'bloqueio'));
+  return partes.join(', ');
+}
+
+/** Número do dia com pontos embaixo: atendimento (rosa da marca) e bloqueio (cinza). */
+function BotaoDia({ day, modifiers, className, ...props }: DayButtonProps) {
+  const marcas = use(ContextoMarcas).get(deDataLocal(day.date));
+  const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    ref.current?.getApi().changeView(VIEW[visao], dia);
-  }, [visao, dia]);
+    if (modifiers.focused) ref.current?.focus();
+  }, [modifiers.focused]);
 
-  const escolhido = (d: Date) => (diaDe(d) === dia ? ['dia-escolhido'] : []);
+  const numero = modifiers.selected
+    ? 'bg-marca font-semibold text-superficie'
+    : modifiers.today
+      ? 'font-semibold text-marca ring-2 ring-marca'
+      : 'group-hover:bg-marca-suave';
 
   return (
-    <div className="calendario -mx-4">
-      <FullCalendar
-        ref={ref}
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        locale={ptBr}
-        timeZone="UTC"
-        now={agora}
-        initialView={VIEW[visao]}
-        initialDate={dia}
-        firstDay={0}
-        headerToolbar={false}
-        height="auto"
-        events={eventos.map((e) => ({
-          id: e.id,
-          title: e.titulo,
-          start: e.inicio,
-          end: e.fim,
-          classNames: [`evento-${e.tipo}`],
-          extendedProps: { tipo: e.tipo },
-        }))}
-        eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-        nowIndicator
-        navLinks
-        navLinkDayClick={(d) => aoTocarDia(diaDe(d))}
-        dayCellClassNames={(a) => escolhido(a.date)}
-        dayHeaderClassNames={(a) => escolhido(a.date)}
-        dateClick={(info) => {
-          const { data, hora } = lerToque(info.dateStr);
-          if (hora) aoTocarHorario(data, hora);
-          else aoTocarDia(data);
-        }}
-        eventClick={(info) => {
-          info.jsEvent.preventDefault();
-          aoTocarEvento(info.event.id, info.event.extendedProps.tipo as TipoEvento);
-        }}
-        views={{
-          dayGridMonth: {
-            dayMaxEvents: 2,
-            eventDisplay: 'list-item',
-            fixedWeekCount: false,
-          },
-          timeGridWeek: {
-            allDaySlot: false,
-            slotMinTime: '06:00:00',
-            slotMaxTime: '22:00:00',
-            slotDuration: '00:30:00',
-            slotLabelInterval: '01:00',
-            slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-            dayHeaderFormat: { weekday: 'narrow', day: 'numeric' },
-          },
-        }}
-      />
-    </div>
+    <button
+      ref={ref}
+      {...props}
+      aria-label={rotuloDoDia(day.date, marcas, modifiers.today)}
+      className={`group flex h-14 w-full flex-col items-center justify-start gap-1 pt-1 text-texto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marca ${className ?? ''}`}
+    >
+      <span
+        className={`flex size-9 items-center justify-center rounded-full text-lg transition-colors ${numero}`}
+      >
+        {day.date.getDate()}
+      </span>
+      <span aria-hidden="true" className="flex h-1.5 gap-1">
+        {!!marcas?.atendimentos && <span className="size-1.5 rounded-full bg-marca-decorativa" />}
+        {!!marcas?.bloqueios && <span className="size-1.5 rounded-full bg-bloqueado" />}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Calendário do mês no estilo dos apps de celular, a partir do Calendar do
+ * shadcn/ui (react-day-picker) com os tokens do tema. Mês e navegação ficam na
+ * tela; aqui só a grade, que também troca de mês ao deslizar.
+ */
+export default function Calendario({ dia, hoje, marcas, aoEscolherDia, aoTrocarMes }: Props) {
+  const toque = useRef<{ x: number; y: number } | null>(null);
+
+  function aoComecar(e: TouchEvent) {
+    const t = e.touches[0];
+    toque.current = t ? { x: t.clientX, y: t.clientY } : null;
+  }
+
+  function aoTerminar(e: TouchEvent) {
+    const t = e.changedTouches[0];
+    const inicio = toque.current;
+    toque.current = null;
+    if (!t || !inicio) return;
+    const dx = t.clientX - inicio.x;
+    if (Math.abs(dx) > DESLIZE_MIN_PX && Math.abs(dx) > Math.abs(t.clientY - inicio.y)) {
+      aoTrocarMes(dx < 0 ? 1 : -1);
+    }
+  }
+
+  return (
+    <ContextoMarcas value={marcas}>
+      <div onTouchStart={aoComecar} onTouchEnd={aoTerminar} className="-mx-2 touch-pan-y">
+        <DayPicker
+          key={primeiroDoMes(dia)}
+          mode="single"
+          required
+          locale={ptBR}
+          month={paraDataLocal(dia)}
+          today={paraDataLocal(hoje)}
+          selected={paraDataLocal(dia)}
+          onSelect={(d) => aoEscolherDia(deDataLocal(d))}
+          onMonthChange={(m) => aoTrocarMes(m > paraDataLocal(dia) ? 1 : -1)}
+          hideNavigation
+          showOutsideDays={false}
+          formatters={{ formatWeekdayName: (d) => format(d, 'EEEEE', { locale: ptBR }) }}
+          components={{ DayButton: BotaoDia }}
+          classNames={{
+            root: 'animate-entrar',
+            month_caption: 'sr-only',
+            month_grid: 'w-full border-collapse',
+            weekdays: 'border-b border-borda',
+            weekday: 'pb-2 text-base font-normal text-texto-suave',
+            week: 'border-b border-borda last:border-b-0',
+            day: 'p-0 text-center',
+          }}
+        />
+      </div>
+    </ContextoMarcas>
   );
 }

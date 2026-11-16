@@ -28,6 +28,7 @@ const COMPONENTE = 3; // WCAG 1.4.11, contorno de campos e foco
 
 // [frente, fundo, mínimo]: toda combinação usada nas telas entra aqui
 const PARES: [string, string, number][] = [
+  ['texto', 'moldura', TEXTO], // título da barra superior
   ['texto', 'fundo', TEXTO],
   ['texto', 'superficie', TEXTO],
   ['texto', 'marca-suave', TEXTO],
@@ -39,7 +40,7 @@ const PARES: [string, string, number][] = [
   ['marca', 'marca-suave', TEXTO],
   ['superficie', 'marca', TEXTO], // botão principal
   ['superficie', 'marca-escura', TEXTO], // botão principal pressionado
-  ['marca-escura', 'marca-suave', TEXTO], // FAB e ícone da aba ativa
+  ['marca-escura', 'marca-suave', TEXTO], // ícone da aba ativa
   ['superficie', 'texto', TEXTO], // snackbar
   ['texto', 'container', TEXTO], // aba ativa na barra de navegação
   ['texto-suave', 'container', TEXTO], // abas inativas
@@ -51,11 +52,12 @@ const PARES: [string, string, number][] = [
   ['bloqueado', 'fundo', TEXTO],
   ['livre', 'superficie', TEXTO], // "Lembrete enviado"
   ['texto', 'pendente', TEXTO],
-  ['superficie', 'marcado', TEXTO], // atendimento no calendário
-  ['superficie', 'bloqueado', TEXTO], // bloqueio no calendário
   ['borda-campo', 'superficie', COMPONENTE],
   ['borda-campo', 'fundo', COMPONENTE],
-  ['marca-decorativa', 'fundo', COMPONENTE],
+  ['marca-decorativa', 'fundo', COMPONENTE], // ponto de atendimento no calendário
+  ['marca-decorativa', 'superficie', COMPONENTE],
+  ['bloqueado', 'superficie', COMPONENTE], // ponto de bloqueio no calendário
+  ['marca', 'moldura', COMPONENTE], // indicador de carregamento
 ];
 
 describe('tema: contraste da paleta (RNF de acessibilidade)', () => {

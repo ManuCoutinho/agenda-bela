@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Campo from '../../componentes/Campo';
 import Fab from '../../componentes/Fab';
 import Icone from '../../componentes/Icone';
@@ -31,11 +32,7 @@ export default function Clientes() {
         Importar dos contatos
       </LinkBotao>
 
-      {carregando && (
-        <p role="status" className="text-texto-suave">
-          Carregando clientes…
-        </p>
-      )}
+      {carregando && <Carregando texto="Carregando clientes…" />}
       {erro && (
         <p role="alert" className="text-erro">
           Não foi possível carregar as clientes. Confira a internet e tente de novo.

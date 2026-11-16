@@ -19,8 +19,8 @@ type Props = {
 };
 
 const TIPOS = [
-  { valor: 'pontual', rotulo: 'Só um dia', dica: 'Ex.: dentista, folga' },
-  { valor: 'recorrente', rotulo: 'Toda semana', dica: 'Ex.: terapia, curso' },
+  { valor: 'pontual', rotulo: 'Só um dia' },
+  { valor: 'recorrente', rotulo: 'Toda semana' },
 ] as const;
 
 export default function FormularioBloqueio({ inicial, aoEnviar, aoCancelar, erroEnvio }: Props) {
@@ -47,9 +47,7 @@ export default function FormularioBloqueio({ inicial, aoEnviar, aoCancelar, erro
               {...register('tipo')}
               className="size-6 shrink-0 accent-marca"
             />
-            <span>
-              {t.rotulo} <span className="text-texto-suave">({t.dica})</span>
-            </span>
+            <span>{t.rotulo}</span>
           </label>
         ))}
       </fieldset>

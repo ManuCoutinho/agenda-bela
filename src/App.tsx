@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
+import Carregando from './componentes/Carregando';
 import PaginaNaoEncontrada from './paginas/PaginaNaoEncontrada';
 import Bloqueios from './paginas/manicure/Bloqueios';
 import Clientes from './paginas/manicure/Clientes';
@@ -13,22 +14,16 @@ import Hoje from './paginas/manicure/Hoje';
 import ImportarClientes from './paginas/manicure/ImportarClientes';
 import LayoutManicure from './paginas/manicure/LayoutManicure';
 import Lembretes from './paginas/manicure/Lembretes';
-import Exportar from './paginas/manicure/Exportar';
 import Instalar from './paginas/manicure/Instalar';
 import Mais from './paginas/manicure/Mais';
-import PaginaAgendamento from './paginas/manicure/PaginaAgendamento';
 import Painel from './paginas/manicure/Painel';
 import Servicos from './paginas/manicure/Servicos';
 import Agendar from './paginas/publica/Agendar';
 
-// O calendário (FullCalendar) só é baixado ao abrir a aba Agenda.
+// O calendário só é baixado ao abrir a aba Agenda.
 const Agenda = lazy(() => import('./paginas/manicure/Agenda'));
 
-const carregandoAgenda = (
-  <p role="status" className="p-6 text-center text-texto-suave">
-    Carregando agenda…
-  </p>
-);
+const carregandoAgenda = <Carregando texto="Carregando agenda…" />;
 
 export default function App() {
   return (
@@ -54,9 +49,7 @@ export default function App() {
         <Route path="clientes/importar" element={<ImportarClientes />} />
         <Route path="clientes/:id" element={<EditarCliente />} />
         <Route path="mais" element={<Mais />} />
-        <Route path="mais/exportar" element={<Exportar />} />
         <Route path="mais/instalar" element={<Instalar />} />
-        <Route path="mais/pagina" element={<PaginaAgendamento />} />
         <Route path="mais/painel" element={<Painel />} />
         <Route path="mais/configuracoes" element={<Configuracoes />} />
         <Route path="mais/servicos" element={<Servicos />} />

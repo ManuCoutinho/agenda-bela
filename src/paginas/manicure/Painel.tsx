@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Icone from '../../componentes/Icone';
 import { ESTILO_BOTAO_ICONE } from '../../componentes/estilos';
 import {
@@ -60,9 +61,7 @@ export default function Painel() {
       </div>
 
       {carregando ? (
-        <p role="status" className="text-texto-suave">
-          Carregando…
-        </p>
+        <Carregando texto="Carregando…" />
       ) : erro ? (
         <p role="alert" className="text-erro">
           Não foi possível carregar o mês. Confira a internet e tente de novo.

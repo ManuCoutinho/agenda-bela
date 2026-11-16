@@ -5,7 +5,6 @@ import {
   DIAS_SEMANA,
   esquemaConfiguracoes,
   formatarAntecedencia,
-  gerarSlug,
   HORAS_EXPEDIENTE,
   INTERVALOS_MIN,
   JANELAS_DIAS,
@@ -31,8 +30,6 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
     register,
     handleSubmit,
     control,
-    getValues,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CamposConfiguracoes, unknown, DadosConfiguracoes>({
     resolver: zodResolver(esquemaConfiguracoes),
@@ -40,26 +37,13 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
   });
 
   const dias = useWatch({ control, name: 'dias' });
-  const slug = useWatch({ control, name: 'slug' });
-
-  // sugere o link a partir do nome, se ainda não houver um
-  const nome = register('nome', {
-    onBlur: () => {
-      if (!getValues('slug')) setValue('slug', gerarSlug(getValues('nome')));
-    },
-  });
 
   return (
     <form noValidate onSubmit={handleSubmit(aoEnviar)} className="flex flex-col gap-6">
       <fieldset className={ESTILO_GRUPO}>
         <legend className={ESTILO_TITULO}>Seu espaço</legend>
-        <Campo
-          id="nome"
-          rotulo="Nome do espaço"
-          dica="Ex.: Espaço Juju"
-          erro={errors.nome?.message}
-        >
-          {(a) => <input {...a} {...nome} type="text" className={ESTILO_CAMPO} />}
+        <Campo id="nome" rotulo="Nome do espaço" erro={errors.nome?.message}>
+          {(a) => <input {...a} {...register('nome')} type="text" className={ESTILO_CAMPO} />}
         </Campo>
         <Campo
           id="whatsapp"
@@ -86,24 +70,6 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
         >
           {(a) => <textarea {...a} {...register('endereco')} rows={2} className={ESTILO_CAMPO} />}
         </Campo>
-        <Campo
-          id="slug"
-          rotulo="Link da página de agendamento"
-          dica={`Seu link: ${window.location.host}/agendar/${slug || 'seu-espaco'}`}
-          erro={errors.slug?.message}
-        >
-          {(a) => (
-            <input
-              {...a}
-              {...register('slug')}
-              type="text"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className={ESTILO_CAMPO}
-            />
-          )}
-        </Campo>
       </fieldset>
 
       <fieldset className={ESTILO_GRUPO}>
@@ -127,8 +93,12 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
                 <span className="font-medium">{rotulo}</span>
               </label>
               {dias[i]?.aberto ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <Campo id={`dia-${i}-ini`} rotulo={`Início (${rotulo.toLowerCase()})`}>
+                <div className="grid grid-cols-2 items-start gap-3">
+                  <Campo
+                    id={`dia-${i}-ini`}
+                    rotulo="Início"
+                    rotuloOculto={`(${rotulo.toLowerCase()})`}
+                  >
                     {(a) => (
                       <select {...a} {...register(`dias.${i}.ini`)} className={ESTILO_CAMPO}>
                         {HORAS_EXPEDIENTE.map((h) => (
@@ -141,7 +111,8 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
                   </Campo>
                   <Campo
                     id={`dia-${i}-fim`}
-                    rotulo={`Fim (${rotulo.toLowerCase()})`}
+                    rotulo="Fim"
+                    rotuloOculto={`(${rotulo.toLowerCase()})`}
                     erro={erroFim}
                   >
                     {(a) => (

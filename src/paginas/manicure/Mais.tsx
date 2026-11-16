@@ -16,11 +16,6 @@ const OPCOES = [
     descricao: 'Avisar as clientes pelo WhatsApp',
   },
   {
-    para: '/mais/pagina',
-    rotulo: 'Página de agendamento',
-    descricao: 'Link para as clientes e pausar agendamentos',
-  },
-  {
     para: '/mais/painel',
     rotulo: 'Painel do mês',
     descricao: 'Realizados, faltas e quanto entrou',
@@ -29,17 +24,12 @@ const OPCOES = [
   {
     para: '/mais/bloqueios',
     rotulo: 'Bloqueios',
-    descricao: 'Horários em que você não atende',
+    descricao: 'Horários de folga e pausar agendamentos',
   },
   {
     para: '/mais/configuracoes',
     rotulo: 'Configurações',
-    descricao: 'Horário de atendimento, link e regras do agendamento',
-  },
-  {
-    para: '/mais/exportar',
-    rotulo: 'Exportar para planilha',
-    descricao: 'Clientes e atendimentos em arquivo .csv',
+    descricao: 'Horário de atendimento, link para as clientes e regras',
   },
   {
     para: '/mais/instalar',

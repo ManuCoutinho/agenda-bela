@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Botao from '../../componentes/Botao';
 import Fab from '../../componentes/Fab';
 import Icone from '../../componentes/Icone';
@@ -84,9 +85,7 @@ export default function Hoje() {
         </section>
       )}
       {carregando ? (
-        <p role="status" className="text-texto-suave">
-          Carregando agenda…
-        </p>
+        <Carregando texto="Carregando agenda…" />
       ) : erro ? (
         <p role="alert" className="text-erro">
           Não foi possível carregar a agenda. Confira a internet e tente de novo.

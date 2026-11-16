@@ -58,6 +58,7 @@ describe('Lembretes de amanhã (RF11)', () => {
         <Lembretes />
       </MemoryRouter>,
     );
+    expect(screen.getByRole('link', { name: 'Voltar' })).toHaveAttribute('href', '/mais');
     expect(useAgendamentos).toHaveBeenCalledWith('2026-12-02', 1);
     expect(screen.getByText('Falta 1 lembrete.', { exact: false })).toBeInTheDocument();
     expect(mostrarEmblema).toHaveBeenLastCalledWith(1);

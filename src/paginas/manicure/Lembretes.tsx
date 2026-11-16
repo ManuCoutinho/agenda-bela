@@ -1,4 +1,5 @@
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Icone from '../../componentes/Icone';
 import { ESTILO_BOTAO } from '../../componentes/estilos';
 import { horaDe, rotuloDia, rotuloHora, type Agendamento } from '../../dominio/agenda';
@@ -26,12 +27,10 @@ export default function Lembretes() {
 
   return (
     <>
-      <BarraSuperior titulo="Lembretes de amanhã" voltarPara="/" />
+      <BarraSuperior titulo="Lembretes de amanhã" voltarPara="/mais" />
       <p className="mb-4 text-texto-suave first-letter:uppercase">{rotuloDia(amanha)}</p>
       {carregando ? (
-        <p role="status" className="text-texto-suave">
-          Carregando…
-        </p>
+        <Carregando texto="Carregando…" />
       ) : erro ? (
         <p role="alert" className="text-erro">
           Não foi possível carregar a agenda de amanhã. Confira a internet e tente de novo.

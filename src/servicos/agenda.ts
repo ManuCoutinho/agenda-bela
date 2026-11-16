@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -153,10 +152,4 @@ export function registrarResultado(id: string, status: 'realizado' | 'falta' | '
   gravarEmSegundoPlano(
     updateDoc(doc(agendamentos, id), { status, atualizadoEm: serverTimestamp() }),
   );
-}
-
-/** Todos os atendimentos, para a exportação (lê do servidor; precisa de internet). */
-export async function buscarTodosAgendamentos(): Promise<Agendamento[]> {
-  const snap = await getDocs(query(agendamentos, orderBy('inicio')));
-  return snap.docs.map((d) => paraAgendamento(d.id, d.data()));
 }

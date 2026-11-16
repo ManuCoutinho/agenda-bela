@@ -13,7 +13,6 @@ import {
 const campos = (mudancas: Partial<CamposConfiguracoes> = {}): CamposConfiguracoes => ({
   ...paraCampos(CONFIGURACOES_PADRAO),
   nome: 'Espaço Juju',
-  slug: 'espaco-juju',
   whatsapp: '(41) 98860-6636',
   ...mudancas,
 });
@@ -43,7 +42,7 @@ describe('formatarAntecedencia', () => {
 });
 
 describe('esquemaConfiguracoes (RF04)', () => {
-  it('aceita o padrão com nome, link e WhatsApp', () => {
+  it('aceita o padrão com nome e WhatsApp', () => {
     expect(mensagens(campos())).toEqual([]);
   });
 
@@ -56,7 +55,16 @@ describe('esquemaConfiguracoes (RF04)', () => {
 
   it('volta ao formulário com os mesmos valores (ida e volta)', () => {
     const config = { ...CONFIGURACOES_PADRAO, nome: 'X', slug: 'x-y', whatsapp: '5541988606636' };
-    expect(paraConfiguracoes(esquemaConfiguracoes.parse(paraCampos(config)))).toEqual(config);
+    expect(paraConfiguracoes(esquemaConfiguracoes.parse(paraCampos(config)), 'x-y')).toEqual(
+      config,
+    );
+  });
+
+  it('o link sai do nome na primeira vez e depois não muda', () => {
+    const dados = esquemaConfiguracoes.parse(campos());
+    expect(paraConfiguracoes(dados).slug).toBe('espaco-juju');
+    expect(paraConfiguracoes(dados, 'juju').slug).toBe('juju');
+    expect(paraConfiguracoes({ ...dados, nome: '!!!' }).slug).toBe('agenda');
   });
 
   it('recusa fim antes do início só em dia aberto', () => {
@@ -69,9 +77,8 @@ describe('esquemaConfiguracoes (RF04)', () => {
     ]);
   });
 
-  it('recusa link com acento ou espaço e WhatsApp sem DDD', () => {
-    expect(mensagens(campos({ slug: 'espaço juju', whatsapp: '98860-6636' }))).toEqual([
-      'slug: Use só letras sem acento, números e hífen, por exemplo espaco-juju.',
+  it('recusa WhatsApp sem DDD', () => {
+    expect(mensagens(campos({ whatsapp: '98860-6636' }))).toEqual([
       'whatsapp: Escreva o WhatsApp com DDD, por exemplo (41) 98860-6636.',
     ]);
   });

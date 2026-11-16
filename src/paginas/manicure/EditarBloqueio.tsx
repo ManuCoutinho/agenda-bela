@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Botao from '../../componentes/Botao';
 import ConflitosBloqueio from '../../componentes/ConflitosBloqueio';
 import FormularioBloqueio from '../../componentes/FormularioBloqueio';
@@ -167,11 +168,7 @@ export default function EditarBloqueio() {
   const bloqueio = bloqueios.find((b) => b.id === id);
 
   if (carregando) {
-    return (
-      <p role="status" className="text-texto-suave">
-        Carregando bloqueio…
-      </p>
-    );
+    return <Carregando texto="Carregando bloqueio…" />;
   }
   if (erro || !bloqueio) {
     return (

@@ -1,4 +1,5 @@
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import { Link, useNavigate, useParams } from 'react-router';
 import FormularioCliente from '../../componentes/FormularioCliente';
 import { ESTILO_LINK } from '../../componentes/estilos';
@@ -22,11 +23,7 @@ export default function EditarCliente() {
   const voltar = () => navegar('/clientes');
 
   if (id && carregando) {
-    return (
-      <p role="status" className="text-texto-suave">
-        Carregando cliente…
-      </p>
-    );
+    return <Carregando texto="Carregando cliente…" />;
   }
   if (id && (erro || !cliente)) {
     return (

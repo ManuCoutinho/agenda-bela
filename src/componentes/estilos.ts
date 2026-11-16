@@ -30,3 +30,9 @@ export const ESTILO_LISTA =
 
 /** Item de lista clicável: 56 dp no mínimo (72 dp com duas linhas), 16 dp nas laterais. */
 export const ESTILO_ITEM_LISTA = `flex min-h-14 w-full items-center gap-4 px-4 py-2 text-texto no-underline hover:bg-fundo active:bg-marca-suave focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marca`;
+
+/** Folha clara do conteúdo sobre a moldura rosa; a barra superior desenha a borda de cima. */
+export const ESTILO_FOLHA = 'mx-auto min-h-dvh max-w-md bg-fundo px-4';
+
+/** Cartão claro centralizado na moldura, para telas sem barra superior (entrar, erro). */
+export const ESTILO_CARTAO_TELA = 'flex flex-col gap-6 rounded-3xl bg-fundo p-6 shadow-lg';

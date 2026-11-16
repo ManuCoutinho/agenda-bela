@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Fab from '../../componentes/Fab';
 import { ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
 import { formatarDuracao, formatarPreco } from '../../dominio/servicos';
@@ -14,11 +15,7 @@ export default function Servicos() {
   return (
     <>
       <BarraSuperior titulo="Serviços" voltarPara="/mais" />
-      {carregando && (
-        <p role="status" className="text-texto-suave">
-          Carregando serviços…
-        </p>
-      )}
+      {carregando && <Carregando texto="Carregando serviços…" />}
       {erro && (
         <p role="alert" className="text-erro">
           Não foi possível carregar os serviços. Confira a internet e tente de novo.

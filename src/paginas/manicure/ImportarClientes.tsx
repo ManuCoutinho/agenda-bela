@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import Botao from '../../componentes/Botao';
 import { ESTILO_BOTAO, ESTILO_LISTA } from '../../componentes/estilos';
 import { formatarWhatsApp } from '../../dominio/clientes';
@@ -82,9 +83,7 @@ export default function ImportarClientes() {
       <BarraSuperior titulo="Importar clientes" voltarPara="/clientes" />
 
       {carregando ? (
-        <p role="status" className="text-texto-suave">
-          Carregando clientes…
-        </p>
+        <Carregando texto="Carregando clientes…" />
       ) : erro ? (
         <p role="alert" className="text-erro">
           Não foi possível carregar as clientes. Confira a internet e tente de novo.

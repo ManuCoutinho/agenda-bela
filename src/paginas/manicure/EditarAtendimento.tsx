@@ -1,4 +1,5 @@
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import Botao from '../../componentes/Botao';
@@ -10,6 +11,7 @@ import {
   HorarioOcupado,
   idsTravas,
   inicioEm,
+  NOVA_CLIENTE,
   rotuloDia,
   rotuloHora,
   type DadosAtendimento,
@@ -20,7 +22,11 @@ import { horasRecorrentesNoDia } from '../../dominio/bloqueios';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
+import { formatarWhatsApp } from '../../dominio/clientes';
+import { dddDe, escolherWhatsApp } from '../../dominio/importacao';
 import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
+import { salvarCliente } from '../../servicos/clientes';
+import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 
 const ERRO_CARREGAR = 'Não foi possível carregar os dados. Confira a internet e tente de novo.';
 
@@ -67,7 +73,14 @@ export default function EditarAtendimento() {
 
   async function salvar(d: DadosAtendimento) {
     setErroEnvio(undefined);
-    const cliente = clientes.clientes.find((c) => c.id === d.clienteId);
+    // cliente nova: se o WhatsApp já está cadastrado, usa a cadastrada
+    const nova = d.novaCliente;
+    const cliente = nova
+      ? (clientes.clientes.find((c) => c.whatsapp === nova.whatsapp) ?? {
+          ...nova,
+          id: salvarCliente(nova),
+        })
+      : clientes.clientes.find((c) => c.id === d.clienteId);
     const servico = servicos.servicos.find((s) => s.id === d.servicoId);
     if (!cliente || !servico) {
       setErroEnvio('Escolha a cliente e o serviço de novo.');
@@ -138,11 +151,7 @@ export default function EditarAtendimento() {
   const erro = clientes.erro || servicos.erro || configuracoes.erro || atendimento.erro;
 
   if (carregando) {
-    return (
-      <p role="status" className="text-texto-suave">
-        Carregando…
-      </p>
-    );
+    return <Carregando texto="Carregando…" />;
   }
   if (erro || (id && !atual)) {
     return (
@@ -168,35 +177,26 @@ export default function EditarAtendimento() {
       </>
     );
   }
-  if (clientes.clientes.length === 0 || servicos.servicos.length === 0) {
+  if (servicos.servicos.length === 0) {
     return (
       <>
         <BarraSuperior titulo={titulo} voltarPara="/" />
-        <p className="mt-4">Para marcar, cadastre antes:</p>
-        <ul className="mt-2 flex flex-col">
-          {clientes.clientes.length === 0 && (
-            <li>
-              <Link
-                to="/clientes/nova"
-                className={`inline-flex min-h-12 items-center ${ESTILO_LINK}`}
-              >
-                uma cliente
-              </Link>
-            </li>
-          )}
-          {servicos.servicos.length === 0 && (
-            <li>
-              <Link
-                to="/mais/servicos/novo"
-                className={`inline-flex min-h-12 items-center ${ESTILO_LINK}`}
-              >
-                um serviço
-              </Link>
-            </li>
-          )}
-        </ul>
+        <p className="mt-4">Para marcar, cadastre antes um serviço.</p>
+        <Link
+          to="/mais/servicos/novo"
+          className={`mt-2 inline-flex min-h-12 items-center ${ESTILO_LINK}`}
+        >
+          Cadastrar serviço
+        </Link>
       </>
     );
+  }
+
+  async function escolherContato() {
+    const contato = await escolherUmContato();
+    if (!contato) return null;
+    const numero = escolherWhatsApp(contato.telefones, dddDe(config.whatsapp));
+    return { nome: contato.nome, whatsapp: numero ? formatarWhatsApp(numero) : '' };
   }
 
   return (
@@ -207,7 +207,8 @@ export default function EditarAtendimento() {
         clientes={clientes.clientes}
         servicos={servicos.servicos}
         inicial={{
-          clienteId: atual?.clienteId ?? '',
+          // sem clientes cadastradas, já abre o cadastro da nova
+          clienteId: atual?.clienteId ?? (clientes.clientes.length === 0 ? NOVA_CLIENTE : ''),
           servicoId: atual?.servicoId ?? '',
           data: dataInicial,
           hora: atual ? horaDe(atual.inicio) : horaPedida,
@@ -217,6 +218,7 @@ export default function EditarAtendimento() {
         intervaloMin={config.intervaloMin}
         expediente={config.expediente}
         aoMudarData={aoMudarData}
+        aoEscolherContato={temSeletorDeContatos() ? escolherContato : undefined}
         aoEnviar={salvar}
         aoCancelar={() => navegar(-1)}
         erroEnvio={erroEnvio}

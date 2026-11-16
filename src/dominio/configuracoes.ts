@@ -94,16 +94,6 @@ export const esquemaConfiguracoes = z.object({
     .trim()
     .min(1, 'Escreva o nome do seu espaço.')
     .max(60, 'Use até 60 letras no nome.'),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(
-      /^[a-z0-9]+(-[a-z0-9]+)*$/,
-      'Use só letras sem acento, números e hífen, por exemplo espaco-juju.',
-    )
-    .min(3, 'Use pelo menos 3 letras no link.')
-    .max(40, 'Use até 40 letras no link.'),
   whatsapp: z.string().transform((texto, ctx) => {
     const numero = normalizarWhatsApp(texto);
     if (!numero) {
@@ -138,9 +128,13 @@ export const esquemaConfiguracoes = z.object({
 export type CamposConfiguracoes = z.input<typeof esquemaConfiguracoes>;
 export type DadosConfiguracoes = z.output<typeof esquemaConfiguracoes>;
 
-export const paraConfiguracoes = (d: DadosConfiguracoes): Configuracoes => ({
+/**
+ * O link sai do nome na primeira vez e depois não muda, para não quebrar o
+ * link que ela já divulgou.
+ */
+export const paraConfiguracoes = (d: DadosConfiguracoes, slugAtual = ''): Configuracoes => ({
   nome: d.nome,
-  slug: d.slug,
+  slug: slugAtual || gerarSlug(d.nome) || 'agenda',
   whatsapp: d.whatsapp,
   endereco: d.endereco,
   expediente: d.dias.flatMap((dia, i) =>
@@ -154,7 +148,6 @@ export const paraConfiguracoes = (d: DadosConfiguracoes): Configuracoes => ({
 /** Preenche o formulário; dia fechado mostra o horário padrão se for aberto. */
 export const paraCampos = (c: Configuracoes): CamposConfiguracoes => ({
   nome: c.nome,
-  slug: c.slug,
   whatsapp: c.whatsapp && formatarWhatsApp(c.whatsapp),
   endereco: c.endereco,
   dias: DIAS_SEMANA.map((_, i) => {

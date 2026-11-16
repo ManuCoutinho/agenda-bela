@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router';
 import Botao from '../../componentes/Botao';
+import { ESTILO_CARTAO_TELA } from '../../componentes/estilos';
 import { useAuth } from '../../hooks/useAuth';
 import { entrarComGoogle } from '../../servicos/autenticacao';
 
@@ -25,19 +26,21 @@ export default function Entrar() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-marca">Agenda Bela</h1>
-        <p className="mt-2 text-texto-suave">Sua agenda de atendimentos.</p>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-4">
+      <div className={ESTILO_CARTAO_TELA}>
+        <div>
+          <h1 className="text-3xl font-semibold text-marca">Agenda Bela</h1>
+          <p className="mt-2 text-texto-suave">Sua agenda de atendimentos.</p>
+        </div>
+        <Botao onClick={entrar} disabled={carregando || entrando}>
+          {entrando ? 'Entrando…' : 'Entrar com Google'}
+        </Botao>
+        {erro && (
+          <p role="alert" className="text-erro">
+            {erro}
+          </p>
+        )}
       </div>
-      <Botao onClick={entrar} disabled={carregando || entrando}>
-        {entrando ? 'Entrando…' : 'Entrar com Google'}
-      </Botao>
-      {erro && (
-        <p role="alert" className="text-erro">
-          {erro}
-        </p>
-      )}
     </main>
   );
 }

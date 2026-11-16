@@ -1,8 +1,9 @@
-import { Link, useSearchParams, useNavigate } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
 import Calendario from '../../componentes/Calendario';
+import Carregando from '../../componentes/Carregando';
 import Fab from '../../componentes/Fab';
 import Icone from '../../componentes/Icone';
 import ListaDoDia from '../../componentes/ListaDoDia';
@@ -11,94 +12,61 @@ import { agruparPorDia, dataDoDia, rotuloDia } from '../../dominio/agenda';
 import { bloqueiosDoDia } from '../../dominio/bloqueios';
 import {
   dataValida,
-  intervaloDaVisao,
-  lerVisao,
-  paraEventos,
-  paraEventosDeBloqueio,
-  paraHoraDeParede,
-  passarPeriodo,
-  tituloDaVisao,
-  type Visao,
+  intervaloDoMes,
+  marcasPorDia,
+  passarMes,
+  tituloDoMes,
 } from '../../dominio/calendario';
 import { useAgendamentos } from '../../hooks/useAgenda';
 import { useAviso } from '../../hooks/useAviso';
 import { useBloqueios } from '../../hooks/useBloqueios';
 
-const VISOES: { visao: Visao; rotulo: string }[] = [
-  { visao: 'semana', rotulo: 'Semana' },
-  { visao: 'mes', rotulo: 'Mês' },
-];
-
 /**
- * `/agenda?visao=semana|mes&dia=AAAA-MM-DD` (RF07): calendário com visão de
- * semana e de mês. Tocar num dia mostra os atendimentos dele embaixo; tocar
- * num horário da semana abre "Novo atendimento" já com dia e hora.
+ * `/agenda?dia=AAAA-MM-DD` (RF07): calendário do mês com pontos nos dias que
+ * têm atendimento ou bloqueio; tocar num dia mostra a lista dele embaixo.
  */
 export default function Agenda() {
-  const navegar = useNavigate();
   const [busca, setBusca] = useSearchParams();
   const hoje = dataDoDia(new Date());
-  const visao = lerVisao(busca.get('visao'));
   const pedido = busca.get('dia');
   const dia = dataValida(pedido) ? pedido : hoje;
 
-  const { inicio, dias } = intervaloDaVisao(visao, dia);
+  const { inicio, dias } = intervaloDoMes(dia);
   const { dados, carregando, erro } = useAgendamentos(inicio, dias);
   const { bloqueios } = useBloqueios();
   const aviso = useAviso();
   const doDia = agruparPorDia(dados).get(dia) ?? [];
+  const { mes, ano } = tituloDoMes(dia);
 
-  const ir = (proxima: { visao?: Visao; dia?: string }) =>
-    setBusca(
-      { visao: proxima.visao ?? visao, dia: proxima.dia ?? dia },
-      { replace: true, preventScrollReset: true },
-    );
+  const ir = (novo: string) => setBusca({ dia: novo }, { replace: true, preventScrollReset: true });
+  const trocarMes = (passo: 1 | -1) => ir(passarMes(dia, passo));
 
   return (
     <>
       <BarraSuperior titulo="Agenda" />
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div
-          role="group"
-          aria-label="Visão"
-          className="flex rounded-full border border-borda-campo"
-        >
-          {VISOES.map((v) => (
-            <button
-              key={v.visao}
-              type="button"
-              aria-pressed={visao === v.visao}
-              onClick={() => ir({ visao: v.visao })}
-              className="min-h-12 min-w-20 rounded-full px-4 font-medium text-texto aria-pressed:bg-marca-suave aria-pressed:text-marca-escura focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca"
-            >
-              {v.rotulo}
-            </button>
-          ))}
-        </div>
+      <nav aria-label="Trocar mês" className="mb-2 flex items-center gap-1">
+        <h2 aria-live="polite" className="flex flex-1 flex-col-reverse">
+          <span className="text-3xl font-semibold">{mes}</span>{' '}
+          <span className="text-base text-texto-suave">{ano}</span>
+        </h2>
         {dia !== hoje && (
-          <Botao variante="texto" onClick={() => ir({ dia: hoje })}>
+          <Botao variante="texto" onClick={() => ir(hoje)}>
             Hoje
           </Botao>
         )}
-      </div>
-
-      <nav aria-label="Trocar período" className="mb-2 flex items-center justify-between gap-2">
         <button
           type="button"
-          aria-label={visao === 'semana' ? 'Semana anterior' : 'Mês anterior'}
-          onClick={() => ir({ dia: passarPeriodo(visao, dia, -1) })}
+          aria-label="Mês anterior"
+          onClick={() => trocarMes(-1)}
           className={ESTILO_BOTAO_ICONE}
         >
           <Icone nome="anterior" />
         </button>
-        <h2 aria-live="polite" className="text-secao font-medium first-letter:uppercase">
-          {tituloDaVisao(visao, dia)}
-        </h2>
         <button
           type="button"
-          aria-label={visao === 'semana' ? 'Próxima semana' : 'Próximo mês'}
-          onClick={() => ir({ dia: passarPeriodo(visao, dia, 1) })}
+          aria-label="Próximo mês"
+          onClick={() => trocarMes(1)}
           className={ESTILO_BOTAO_ICONE}
         >
           <Icone nome="proximo" />
@@ -112,18 +80,14 @@ export default function Agenda() {
       )}
 
       <Calendario
-        visao={visao}
         dia={dia}
-        eventos={[...paraEventos(dados), ...paraEventosDeBloqueio(bloqueios, inicio, dias)]}
-        agora={paraHoraDeParede(new Date())}
-        aoTocarDia={(d) => ir({ dia: d })}
-        aoTocarHorario={(d, hora) => navegar(`/atendimentos/novo?data=${d}&hora=${hora}`)}
-        aoTocarEvento={(id, tipo) =>
-          navegar(tipo === 'bloqueio' ? `/mais/bloqueios/${id}` : `/atendimentos/${id}`)
-        }
+        hoje={hoje}
+        marcas={marcasPorDia(dados, bloqueios, inicio, dias)}
+        aoEscolherDia={ir}
+        aoTrocarMes={trocarMes}
       />
 
-      <section aria-labelledby="dia-escolhido" className="mt-6">
+      <section aria-labelledby="dia-escolhido" className="mt-4 border-t border-borda pt-4">
         <div className="mb-2 flex items-center justify-between gap-4">
           <h2 id="dia-escolhido" className="text-secao font-medium first-letter:uppercase">
             {dia === hoje ? `Hoje, ${rotuloDia(dia)}` : rotuloDia(dia)}
@@ -137,9 +101,7 @@ export default function Agenda() {
           </Link>
         </div>
         {carregando ? (
-          <p role="status" className="text-texto-suave">
-            Carregando agenda…
-          </p>
+          <Carregando texto="Carregando agenda…" />
         ) : (
           !erro && (
             <ListaDoDia

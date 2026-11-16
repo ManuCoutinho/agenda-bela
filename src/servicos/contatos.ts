@@ -21,3 +21,11 @@ export async function escolherContatos(): Promise<ContatoImportado[]> {
   const escolhidos = await seletor.select(['name', 'tel'], { multiple: true });
   return escolhidos.map((c) => ({ nome: c.name?.[0] ?? '', telefones: c.tel ?? [] }));
 }
+
+/** Um contato só, para cadastrar a cliente ao marcar; `null` se ela fechou o seletor. */
+export async function escolherUmContato(): Promise<ContatoImportado | null> {
+  const seletor = gerente();
+  if (!seletor) return null;
+  const [contato] = await seletor.select(['name', 'tel'], { multiple: false });
+  return contato ? { nome: contato.name?.[0] ?? '', telefones: contato.tel ?? [] } : null;
+}

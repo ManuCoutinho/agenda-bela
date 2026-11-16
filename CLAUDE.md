@@ -29,7 +29,7 @@ firebase deploy --only firestore   # regras: deploy manual, nunca pelo CI (gera 
 
 - Commits assinados só pela usuária (identidade do `git config`): sem `Co-Authored-By` nem outra menção ao Claude em commits e PRs.
 - Não usar `gh`. Git só pela CLI padrão; PR e merge pelo site do GitHub.
-- Push por SSH (o  tem pushurl ); o Claude envia a branch e entrega título/descrição do PR para a usuária abrir no site.
+- Push por SSH (o tem pushurl ); o Claude envia a branch e entrega título/descrição do PR para a usuária abrir no site.
 - `main` protegida: branch por história (`feat/rf02-clientes`), Conventional Commits citando o requisito (`feat(RF02): …`), PR com o check `verificar`.
 - CI (`.github/workflows/ci.yml`): `verificar` (lint → test → test:regras → build) → `previa` em PR / `producao` na `main`.
 
@@ -49,11 +49,12 @@ Testes ao lado do arquivo (`.test.ts(x)`); testes de regras em `testes/regras/`.
 
 - Domínio em inglês (`Agendamento`, `travas`, `horariosLivres`); convenções do ecossistema em inglês (`use…`, `on…`).
 - Datas: fuso `America/Sao_Paulo`, `date-fns` + `@date-fns/tz` com `ptBR`; IDs de trava `AAAA-MM-DD_HHmm`.
-- Calendário: FullCalendar 6.1 (MIT) só em `src/componentes/Calendario.tsx`; roda em UTC com a hora de parede de São Paulo (conversões em `src/dominio/calendario.ts`). A aba Agenda é carregada sob demanda (`lazy`).
+- Calendário: visão de mês estilo celular em `src/componentes/Calendario.tsx`, a partir do Calendar do shadcn/ui (`react-day-picker`, MIT) com os tokens do tema; dias como `AAAA-MM-DD` (conversões e marcas por dia em `src/dominio/calendario.ts`). A aba Agenda é carregada sob demanda (`lazy`).
+- Carregamento: `Carregando` (spinner, texto só para leitor de tela). FAB só com ícone (`rotulo` vira `aria-label`).
 - Mensagens à usuária dizem o que fazer, sem códigos técnicos. Sem `console.log`.
 - Acessibilidade: alvos ≥ 48 px (`min-h-12`, padrão do Android), texto ≥ 16 px (mesmo onde o Material usa 12–14), rótulo em todo campo, contraste 4,5:1.
 - Visual de app Android (Material 3), 1 dp = 1 px CSS: tela = `BarraSuperior` (64 dp, seta de voltar) + conteúdo com 16 dp nas laterais + `Fab` para a ação principal + `BarraInferior` (80 dp); confirmações pelo snackbar `Aviso`. Use as classes de `src/componentes/estilos.ts` (`ESTILO_BOTAO`, `ESTILO_CAMPO` 56 dp, `ESTILO_LISTA`/`ESTILO_ITEM_LISTA`) e os ícones de `Icone.tsx`; espaçamento em múltiplos de 4/8 dp; tipografia `text-titulo`/`text-secao`; fonte do sistema (Roboto).
-- Cores só pelos tokens do `@theme` em `src/index.css` (paleta do Espaço Juju): `marca`, `marca-escura`, `marca-suave`, `marca-decorativa` (só enfeite, nunca texto), `fundo`, `superficie`, `container` (barra de navegação), `texto`, `texto-suave`, `borda`, `borda-campo`, `erro` e os estados `marcado`, `livre`, `bloqueado`, `pendente`. O ESLint recusa a paleta padrão do Tailwind (`text-gray-700`, `bg-white`, `[#hex]`). Combinação nova de cores entra em `PARES` de `src/tema.test.ts`, que confere o contraste AA.
+- Cores só pelos tokens do `@theme` em `src/index.css` (Happy Hues nº 7 com o rosa `#c9637b` do Espaço Juju): `moldura` (fundo do app e barra superior; sobre ela só texto `texto`), `marca`, `marca-escura`, `marca-suave`, `marca-decorativa` (pontos do calendário/enfeite, nunca texto), `fundo` (folha do conteúdo: `ESTILO_FOLHA`), `superficie`, `container` (barra de navegação), `texto`, `texto-suave`, `borda`, `borda-campo`, `erro` e os estados `marcado`, `livre`, `bloqueado`, `pendente`. O ESLint recusa a paleta padrão do Tailwind (`text-gray-700`, `bg-white`, `[#hex]`). Combinação nova de cores entra em `PARES` de `src/tema.test.ts`, que confere o contraste AA.
 - Toda mudança em `firestore.rules` vem com teste em `testes/regras/`.
 - Versões fixadas: TypeScript ~6.0 e ESLint 9 (typescript-eslint e jsx-a11y ainda não suportam TS 7 / ESLint 10).
 - Vitest: em `beforeEach`, use chaves – uma função retornada vira rotina de limpeza.

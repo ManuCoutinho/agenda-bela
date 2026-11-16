@@ -10,9 +10,16 @@ import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { useBloqueios } from '../../hooks/useBloqueios';
 import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
+import { salvarCliente } from '../../servicos/clientes';
+import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 import EditarAtendimento from './EditarAtendimento';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
+vi.mock('../../servicos/clientes', () => ({ salvarCliente: vi.fn(() => 'c-nova') }));
+vi.mock('../../servicos/contatos', () => ({
+  escolherUmContato: vi.fn(),
+  temSeletorDeContatos: vi.fn(() => false),
+}));
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
 vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
@@ -181,12 +188,81 @@ describe('EditarAtendimento (RF07)', () => {
     expect(await screen.findByText(/cancelado\. O horário ficou livre\./)).toBeInTheDocument();
   });
 
-  it('orienta a cadastrar cliente antes de marcar', () => {
+  it('sem clientes, já abre o cadastro da nova e marca com ela', async () => {
     vi.mocked(useClientes).mockReturnValue({ clientes: [], carregando: false, erro: false });
+    vi.mocked(marcarAtendimento).mockResolvedValue('a9');
+    renderizar('/atendimentos/novo?data=2026-12-01');
+    expect(screen.getByLabelText('Cliente')).toHaveValue('nova');
+    await userEvent.type(screen.getByLabelText('Nome'), 'Bia');
+    await userEvent.type(screen.getByLabelText('WhatsApp com DDD'), '41999990000');
+    await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
+    await userEvent.selectOptions(screen.getByLabelText('Horário de início'), '09:00');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar atendimento' }));
+    expect(screen.getByLabelText(/A cliente autorizou/)).toHaveAccessibleDescription(
+      'Marque a autorização da cliente para guardar os dados.',
+    );
+    expect(salvarCliente).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByLabelText(/A cliente autorizou/));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar atendimento' }));
+    expect(salvarCliente).toHaveBeenCalledWith({
+      nome: 'Bia',
+      whatsapp: '5541999990000',
+      observacao: '',
+      consentimento: true,
+    });
+    expect(marcarAtendimento).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clienteId: 'c-nova',
+        clienteNome: 'Bia',
+        clienteWhatsapp: '5541999990000',
+      }),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('nova cliente com WhatsApp já cadastrado usa a cadastrada', async () => {
+    vi.mocked(salvarCliente).mockClear();
+    vi.mocked(marcarAtendimento).mockResolvedValue('a9');
+    renderizar('/atendimentos/novo?data=2026-12-01');
+    await userEvent.selectOptions(screen.getByLabelText('Cliente'), '+ Nova cliente');
+    await userEvent.type(screen.getByLabelText('Nome'), 'Ana Paula');
+    await userEvent.type(screen.getByLabelText('WhatsApp com DDD'), '(41) 98860-6636');
+    await userEvent.click(screen.getByLabelText(/A cliente autorizou/));
+    await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
+    await userEvent.selectOptions(screen.getByLabelText('Horário de início'), '09:00');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar atendimento' }));
+    expect(salvarCliente).not.toHaveBeenCalled();
+    expect(marcarAtendimento).toHaveBeenCalledWith(
+      expect.objectContaining({ clienteId: 'c1', clienteNome: 'Ana' }),
+      undefined,
+      undefined,
+    );
+  });
+
+  it('preenche a nova cliente com um contato do celular', async () => {
+    vi.mocked(temSeletorDeContatos).mockReturnValue(true);
+    vi.mocked(escolherUmContato).mockResolvedValue({
+      nome: 'Carla',
+      telefones: ['(41) 3333-4444', '(41) 99888-7777'],
+    });
+    renderizar('/atendimentos/novo?data=2026-12-01');
+    await userEvent.selectOptions(screen.getByLabelText('Cliente'), '+ Nova cliente');
+    await userEvent.click(screen.getByRole('button', { name: 'Escolher dos contatos' }));
+    expect(screen.getByLabelText('Nome')).toHaveValue('Carla');
+    // prefere o celular
+    expect(screen.getByLabelText('WhatsApp com DDD')).toHaveValue('(41) 99888-7777');
+    vi.mocked(temSeletorDeContatos).mockReturnValue(false);
+  });
+
+  it('sem serviço cadastrado, orienta a cadastrar', () => {
+    vi.mocked(useServicos).mockReturnValue({ servicos: [], carregando: false, erro: false });
     renderizar('/atendimentos/novo');
-    expect(screen.getByRole('link', { name: 'uma cliente' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Cadastrar serviço' })).toHaveAttribute(
       'href',
-      '/clientes/nova',
+      '/mais/servicos/novo',
     );
   });
 

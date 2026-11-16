@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import Aviso from '../../componentes/Aviso';
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Botao from '../../componentes/Botao';
+import Campo from '../../componentes/Campo';
+import Carregando from '../../componentes/Carregando';
 import Fab from '../../componentes/Fab';
-import { ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
+import { ESTILO_CAMPO, ESTILO_ITEM_LISTA, ESTILO_LISTA } from '../../componentes/estilos';
 import { dataDoDia } from '../../dominio/agenda';
 import {
   rotuloHorario,
@@ -12,6 +16,62 @@ import {
 } from '../../dominio/bloqueios';
 import { useAviso } from '../../hooks/useAviso';
 import { useBloqueios } from '../../hooks/useBloqueios';
+import { usePausa } from '../../hooks/usePausa';
+import { salvarPausa } from '../../servicos/configPublica';
+
+/** RF14: pausar a página pública (férias, agenda cheia); o que já existe continua. */
+function Pausa() {
+  const { pausa, carregando } = usePausa();
+  const [aviso, setAviso] = useState('');
+  if (carregando) return null;
+
+  return (
+    <section
+      aria-labelledby="titulo-pausa"
+      className={`mb-6 flex flex-col gap-3 rounded-xl p-4 ${pausa.ativa ? 'bg-pendente' : 'border border-borda bg-superficie'}`}
+    >
+      <h2 id="titulo-pausa" className="text-secao font-medium">
+        {pausa.ativa ? 'Agendamentos pausados' : 'Pausar agendamentos'}
+      </h2>
+      {pausa.ativa ? (
+        <>
+          <p role="status">
+            As clientes veem o aviso e não conseguem pedir horário.
+            {pausa.aviso && ` Aviso: “${pausa.aviso}”`}
+          </p>
+          <Botao onClick={() => salvarPausa({ ativa: false, aviso: '' })}>
+            Reabrir agendamentos
+          </Botao>
+        </>
+      ) : (
+        <>
+          <p className="text-texto-suave">
+            Férias ou agenda cheia? Enquanto estiver pausada, as clientes não conseguem pedir
+            horário pela página. Os atendimentos marcados continuam.
+          </p>
+          <Campo id="aviso-pausa" rotulo="Aviso para as clientes (opcional)">
+            {(a) => (
+              <textarea
+                {...a}
+                rows={2}
+                maxLength={200}
+                value={aviso}
+                onChange={(e) => setAviso(e.target.value)}
+                className={ESTILO_CAMPO}
+              />
+            )}
+          </Campo>
+          <Botao
+            variante="secundario"
+            onClick={() => salvarPausa({ ativa: true, aviso: aviso.trim() })}
+          >
+            Pausar agendamentos
+          </Botao>
+        </>
+      )}
+    </section>
+  );
+}
 
 function Lista({ titulo, itens, vazio }: { titulo: string; itens: Bloqueio[]; vazio: string }) {
   const id = `secao-${titulo.replace(/\W+/g, '-').toLowerCase()}`;
@@ -51,13 +111,12 @@ export default function Bloqueios() {
   return (
     <>
       <BarraSuperior titulo="Bloqueios" voltarPara="/mais" />
+      <Pausa />
       <p className="mb-4 text-texto-suave">
         Horários em que você não atende. As clientes não conseguem pedir esses horários.
       </p>
       {carregando ? (
-        <p role="status" className="text-texto-suave">
-          Carregando bloqueios…
-        </p>
+        <Carregando texto="Carregando bloqueios…" />
       ) : erro ? (
         <p role="alert" className="text-erro">
           Não foi possível carregar os bloqueios. Confira a internet e tente de novo.

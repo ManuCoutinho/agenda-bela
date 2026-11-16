@@ -1,7 +1,8 @@
-// Ícones do Material Icons (Apache 2.0), 24 × 24 dp. Decorativos: o nome
-// acessível vem do botão/link que os contém.
+// Ícones do Material Icons (Apache 2.0), 24 × 24 dp.
 const CAMINHOS = {
   adicionar: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  copiar:
+    'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
   voltar: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
   anterior: 'M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z',
   proximo: 'M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',

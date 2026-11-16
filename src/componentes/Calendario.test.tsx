@@ -1,59 +1,43 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import Calendario from './Calendario';
 
-const EVENTOS = [
-  {
-    id: 'a1',
-    tipo: 'atendimento' as const,
-    titulo: 'Ana · Mão',
-    inicio: '2026-11-12T14:30:00',
-    fim: '2026-11-12T15:30:00',
-  },
-  {
-    id: 'b1',
-    tipo: 'bloqueio' as const,
-    titulo: 'Bloqueado',
-    inicio: '2026-11-13T09:00:00',
-    fim: '2026-11-13T10:00:00',
-  },
-];
-
-function renderizar(visao: 'semana' | 'mes') {
-  const props = {
-    aoTocarDia: vi.fn(),
-    aoTocarHorario: vi.fn(),
-    aoTocarEvento: vi.fn(),
-  };
+function renderizar() {
+  const props = { aoEscolherDia: vi.fn(), aoTrocarMes: vi.fn() };
   render(
     <Calendario
-      visao={visao}
       dia="2026-11-12"
-      eventos={EVENTOS}
-      agora="2026-11-12T10:00:00"
+      hoje="2026-11-10"
+      marcas={new Map([['2026-11-12', { atendimentos: 2, bloqueios: 1 }]])}
       {...props}
     />,
   );
   return props;
 }
 
-// Fumaça: o FullCalendar de verdade monta no jsdom (sem medir layout).
-describe('Calendario (FullCalendar)', () => {
-  it('semana: mostra o atendimento na hora de São Paulo e abre ao tocar', () => {
-    const { aoTocarEvento } = renderizar('semana');
-    expect(screen.getByText('Ana · Mão')).toBeInTheDocument();
-    expect(screen.getByText('14:30 - 15:30')).toBeInTheDocument();
-    screen.getByText('Ana · Mão').click();
-    expect(aoTocarEvento).toHaveBeenCalledWith('a1', 'atendimento');
-    screen.getByText('Bloqueado').click();
-    expect(aoTocarEvento).toHaveBeenCalledWith('b1', 'bloqueio');
+describe('Calendario (mês)', () => {
+  it('mostra o mês do dia escolhido, com hoje e as marcas no nome do dia', () => {
+    renderizar();
+    expect(screen.getAllByRole('button')).toHaveLength(30);
+    const escolhido = screen.getByRole('button', {
+      name: 'quinta-feira, 12 de novembro, 2 atendimentos, 1 bloqueio',
+    });
+    expect(escolhido.closest('[role="gridcell"]')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'terça-feira, 10 de novembro, hoje' })).toBeVisible();
   });
 
-  it('mês: destaca o dia escolhido e troca de dia ao tocar no número', () => {
-    const { aoTocarDia } = renderizar('mes');
-    const escolhido = document.querySelector('.dia-escolhido');
-    expect(escolhido).toHaveAttribute('data-date', '2026-11-12');
-    screen.getByTitle('Ir para 20 de novembro de 2026').click();
-    expect(aoTocarDia).toHaveBeenCalledWith('2026-11-20');
+  it('tocar num dia escolhe o dia', async () => {
+    const { aoEscolherDia } = renderizar();
+    await userEvent.click(screen.getByRole('button', { name: 'sexta-feira, 20 de novembro' }));
+    expect(aoEscolherDia).toHaveBeenCalledWith('2026-11-20');
+  });
+
+  it('deslizar para a esquerda vai ao próximo mês', () => {
+    const { aoTrocarMes } = renderizar();
+    const grade = screen.getByRole('grid');
+    fireEvent.touchStart(grade, { touches: [{ clientX: 300, clientY: 100 }] });
+    fireEvent.touchEnd(grade, { changedTouches: [{ clientX: 100, clientY: 110 }] });
+    expect(aoTrocarMes).toHaveBeenCalledWith(1);
   });
 });

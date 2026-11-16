@@ -9,6 +9,8 @@ type AtributosCampo = {
 type Props = {
   id: string;
   rotulo: string;
+  /** Completa o rótulo só para o leitor de tela, ex.: o dia em "Início". */
+  rotuloOculto?: string;
   dica?: string;
   erro?: string;
   /** Recebe os atributos de acessibilidade para pôr no input/textarea. */
@@ -16,7 +18,7 @@ type Props = {
 };
 
 /** Rótulo, dica e erro ligados ao campo (aria-describedby / aria-invalid). */
-export default function Campo({ id, rotulo, dica, erro, children }: Props) {
+export default function Campo({ id, rotulo, rotuloOculto, dica, erro, children }: Props) {
   const idDica = dica ? `${id}-dica` : undefined;
   const idErro = erro ? `${id}-erro` : undefined;
   const descritoPor = [idDica, idErro].filter(Boolean).join(' ') || undefined;
@@ -25,6 +27,7 @@ export default function Campo({ id, rotulo, dica, erro, children }: Props) {
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="font-medium">
         {rotulo}
+        {rotuloOculto && <span className="sr-only"> {rotuloOculto}</span>}
       </label>
       {dica && (
         <p id={idDica} className="text-texto-suave">

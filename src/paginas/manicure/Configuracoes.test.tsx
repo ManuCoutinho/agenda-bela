@@ -5,10 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { salvarConfiguracoes } from '../../servicos/configPublica';
+import { copiarTexto } from '../../servicos/encurtador';
 import Configuracoes from './Configuracoes';
 
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/configPublica', () => ({ salvarConfiguracoes: vi.fn() }));
+vi.mock('../../servicos/encurtador', () => ({ copiarTexto: vi.fn() }));
+vi.mock('../../hooks/useLinkAgendamento', () => ({
+  useLinkAgendamento: (slug: string) => ({
+    link: slug ? 'https://is.gd/abc123' : '',
+    carregando: false,
+  }),
+}));
 
 function Destino() {
   return <p>Mais: {(useLocation().state as { aviso: string }).aviso}</p>;
@@ -37,11 +45,10 @@ describe('Configurações (RF04)', () => {
     });
   });
 
-  it('sugere o link pelo nome e salva o expediente da semana', async () => {
+  it('cria o link pelo nome e salva o expediente da semana', async () => {
     renderizar();
+    expect(screen.getByText('Salve as configurações para criar o seu link.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Nome do espaço'), 'Espaço Juju');
-    await userEvent.tab();
-    expect(screen.getByLabelText('Link da página de agendamento')).toHaveValue('espaco-juju');
 
     await userEvent.type(screen.getByLabelText('Seu WhatsApp'), '41988606636');
     // abre o domingo, fecha o sábado, muda a terça
@@ -86,6 +93,26 @@ describe('Configurações (RF04)', () => {
       'O fim precisa ser depois do início.',
     );
     expect(salvarConfiguracoes).not.toHaveBeenCalled();
+  });
+
+  it('copia o link curto da página de agendamento, sem mudar o link ao salvar', async () => {
+    vi.mocked(useConfiguracoes).mockReturnValue({
+      config: { ...CONFIGURACOES_PADRAO, nome: 'Juju', slug: 'juju', whatsapp: '5541988606636' },
+      carregando: false,
+      erro: false,
+    });
+    renderizar();
+    expect(screen.getByRole('link', { name: 'https://is.gd/abc123' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copiar link' }));
+    expect(copiarTexto).toHaveBeenCalledWith('https://is.gd/abc123');
+    expect(await screen.findByText(/Link copiado/)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText('Nome do espaço'));
+    await userEvent.type(screen.getByLabelText('Nome do espaço'), 'Espaço Novo');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar configurações' }));
+    expect(salvarConfiguracoes).toHaveBeenCalledWith(
+      expect.objectContaining({ nome: 'Espaço Novo', slug: 'juju' }),
+    );
   });
 
   it('dia fechado não mostra horários', () => {

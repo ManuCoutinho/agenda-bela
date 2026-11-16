@@ -1,4 +1,5 @@
 import BarraSuperior from '../../componentes/BarraSuperior';
+import Carregando from '../../componentes/Carregando';
 import { Link, useNavigate, useParams } from 'react-router';
 import FormularioServico from '../../componentes/FormularioServico';
 import { ESTILO_LINK } from '../../componentes/estilos';
@@ -25,11 +26,7 @@ export default function EditarServico() {
   }
 
   if (carregando) {
-    return (
-      <p role="status" className="text-texto-suave">
-        Carregando serviços…
-      </p>
-    );
+    return <Carregando texto="Carregando serviços…" />;
   }
   if (erro || (id && !servico)) {
     return (

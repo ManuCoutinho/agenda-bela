@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Agendamento } from './agenda';
 import { normalizarWhatsApp } from './clientes';
 
 /** RN02: o pedido segura o horário por 24 h (as regras aceitam até 24 h). */
@@ -78,3 +79,54 @@ export const textoConfirmacao = (p: {
 export const textoRecusa = (p: { nome: string; quando: string; link: string }) =>
   `Oi, ${p.nome}! Infelizmente não consigo te atender no horário que você pediu (${p.quando}). ` +
   `Se quiser, escolha outro horário por aqui: ${p.link}`;
+
+/** Horário que a cliente já tem (atendimento marcado) ou já pediu (pedido pendente). */
+export type OutroHorario =
+  { tipo: 'agendamento'; agendamento: Agendamento } | { tipo: 'pedido'; pedido: Pedido };
+
+export const inicioDoOutro = (o: OutroHorario) =>
+  o.tipo === 'agendamento' ? o.agendamento.inicio : o.pedido.inicio;
+
+/**
+ * Horários futuros do mesmo WhatsApp: indicam que o pedido pode ser troca de
+ * horário, não um atendimento a mais. Do mais próximo ao mais distante.
+ */
+export function outrosHorariosDaCliente(
+  pedido: Pedido,
+  {
+    agendamentos,
+    pendentes,
+    agora,
+  }: { agendamentos: readonly Agendamento[]; pendentes: readonly Pedido[]; agora: Date },
+): OutroHorario[] {
+  const futuro = (d: Date) => d.getTime() > agora.getTime();
+  const marcados = agendamentos
+    .filter(
+      (a) => a.clienteWhatsapp === pedido.whatsapp && a.status === 'marcado' && futuro(a.inicio),
+    )
+    .map((agendamento): OutroHorario => ({ tipo: 'agendamento', agendamento }));
+  const pedidos = pendentes
+    .filter(
+      (p) =>
+        p.id !== pedido.id &&
+        p.whatsapp === pedido.whatsapp &&
+        p.status === 'pendente' &&
+        futuro(p.inicio),
+    )
+    .map((outro): OutroHorario => ({ tipo: 'pedido', pedido: outro }));
+  return [...marcados, ...pedidos].sort(
+    (a, b) => inicioDoOutro(a).getTime() - inicioDoOutro(b).getTime(),
+  );
+}
+
+/** Mensagem da manicure ao trocar o horário antigo pelo do pedido novo. */
+export const textoTroca = (p: {
+  nome: string;
+  servico: string;
+  antes: string;
+  quando: string;
+  endereco: string;
+}) =>
+  `Oi, ${p.nome}! Troquei o seu horário: o de ${p.antes} passou para ${p.quando} (${p.servico}).` +
+  (p.endereco ? ` Endereço: ${p.endereco}.` : '') +
+  ' Até lá!';

@@ -73,6 +73,19 @@ export function observarAgendamento(
   );
 }
 
+/** Atendimentos de uma cliente pelo WhatsApp (sem índice composto: filtre status e data). */
+export function observarAgendamentosDaCliente(
+  whatsapp: string,
+  aoMudar: (agendamentos: Agendamento[]) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(agendamentos, where('clienteWhatsapp', '==', whatsapp)),
+    (snap) => aoMudar(snap.docs.map((d) => paraAgendamento(d.id, d.data()))),
+    aoFalhar,
+  );
+}
+
 /** Horas (HHmm) com trava ativa no dia (AAAA-MM-DD): atendimentos e pedidos pendentes. */
 export function observarOcupados(
   data: string,

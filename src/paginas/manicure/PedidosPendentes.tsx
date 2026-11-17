@@ -4,19 +4,35 @@ import Icone from '../../componentes/Icone';
 import { ESTILO_BOTAO } from '../../componentes/estilos';
 import { dataDoDia, horaDe, HorarioOcupado, rotuloDia, rotuloHora } from '../../dominio/agenda';
 import { formatarWhatsApp } from '../../dominio/clientes';
-import { pedidoExpirado, textoConfirmacao, textoRecusa, type Pedido } from '../../dominio/pedidos';
+import {
+  inicioDoOutro,
+  outrosHorariosDaCliente,
+  pedidoExpirado,
+  textoConfirmacao,
+  textoRecusa,
+  textoTroca,
+  type OutroHorario,
+  type Pedido,
+} from '../../dominio/pedidos';
 import { formatarDuracao, type Servico } from '../../dominio/servicos';
 import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
-import { usePedidosPendentes } from '../../hooks/usePedidos';
+import { useAgendamentosDasClientes, usePedidosPendentes } from '../../hooks/usePedidos';
 import { useServicos } from '../../hooks/useServicos';
 import { aprovarPedido, descartarPedido, recusarPedido } from '../../servicos/pedidos';
 
-const quando = (p: Pedido) =>
-  `${rotuloDia(dataDoDia(p.inicio))}, às ${rotuloHora(horaDe(p.inicio))}`;
+const quandoEm = (inicio: Date) =>
+  `${rotuloDia(dataDoDia(inicio))}, às ${rotuloHora(horaDe(inicio))}`;
+const quando = (p: Pedido) => quandoEm(p.inicio);
 
-type Resposta = { pedido: Pedido; tipo: 'aprovado' | 'recusado'; link: string };
+type Resposta = { pedido: Pedido; tipo: 'aprovado' | 'trocado' | 'recusado'; link: string };
+
+const STATUS_RESPOSTA: Record<Resposta['tipo'], string> = {
+  aprovado: 'aprovado e marcado na agenda',
+  trocado: 'horário trocado na agenda',
+  recusado: 'recusado e horário liberado',
+};
 
 /** RF10: pedidos da página pública esperando resposta, no topo da tela Hoje. */
 export default function PedidosPendentes() {
@@ -24,6 +40,7 @@ export default function PedidosPendentes() {
   const { servicos } = useServicos();
   const { clientes } = useClientes();
   const { config } = useConfiguracoes();
+  const agendamentosDasClientes = useAgendamentosDasClientes(pedidos.map((p) => p.whatsapp));
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [ocupado, setOcupado] = useState<string>();
   const [recusando, setRecusando] = useState<string>();
@@ -46,20 +63,27 @@ export default function PedidosPendentes() {
       ]),
     );
 
-  async function aprovar(p: Pedido) {
+  async function aprovar(p: Pedido, substitui?: OutroHorario) {
     const servico = servicoDe(p);
     setOcupado(p.id);
     definirErro(p.id);
     try {
       const cliente = clientes.find((c) => c.whatsapp === p.whatsapp);
-      await aprovarPedido(p, servico, cliente?.id);
-      const texto = textoConfirmacao({
+      await aprovarPedido(p, servico, cliente?.id, substitui);
+      const mensagem = {
         nome: p.nome,
         servico: servico.nome,
         quando: quando(p),
         endereco: config.endereco,
+      };
+      const texto = substitui
+        ? textoTroca({ ...mensagem, antes: quandoEm(inicioDoOutro(substitui)) })
+        : textoConfirmacao(mensagem);
+      responder({
+        pedido: p,
+        tipo: substitui ? 'trocado' : 'aprovado',
+        link: linkWhatsApp(p.whatsapp, texto),
       });
-      responder({ pedido: p, tipo: 'aprovado', link: linkWhatsApp(p.whatsapp, texto) });
     } catch (e) {
       if (e instanceof HorarioOcupado) {
         definirErro(
@@ -98,16 +122,12 @@ export default function PedidosPendentes() {
             key={`r-${r.pedido.id}`}
             className="flex flex-col gap-3 rounded-xl border border-borda bg-superficie p-4"
           >
-            <p role="status">
-              {r.tipo === 'aprovado'
-                ? `${r.pedido.nome}: aprovado e marcado na agenda. Avise a cliente:`
-                : `${r.pedido.nome}: recusado e horário liberado. Avise a cliente:`}
-            </p>
+            <p role="status">{`${r.pedido.nome}: ${STATUS_RESPOSTA[r.tipo]}. Avise a cliente:`}</p>
             <a href={r.link} target="_blank" rel="noreferrer" className={ESTILO_BOTAO.principal}>
               <Icone nome="conversa" />
-              {r.tipo === 'aprovado'
-                ? 'Enviar confirmação no WhatsApp'
-                : 'Enviar aviso no WhatsApp'}
+              {r.tipo === 'recusado'
+                ? 'Enviar aviso no WhatsApp'
+                : 'Enviar confirmação no WhatsApp'}
             </a>
             <Botao
               variante="texto"
@@ -122,6 +142,12 @@ export default function PedidosPendentes() {
           .map((p) => {
             const servico = servicoDe(p);
             const expirado = pedidoExpirado(p, agora);
+            const outros = outrosHorariosDaCliente(p, {
+              agendamentos: agendamentosDasClientes,
+              pendentes: pedidos,
+              agora,
+            });
+            const trocar = outros[0];
             return (
               <li
                 key={p.id}
@@ -140,6 +166,28 @@ export default function PedidosPendentes() {
                     </p>
                   )}
                 </div>
+                {trocar && (
+                  <div className="rounded-lg bg-marca-suave p-3">
+                    <p className="font-medium">{p.nome} já tem horário:</p>
+                    <ul>
+                      {outros.map((o) =>
+                        o.tipo === 'agendamento' ? (
+                          <li key={o.agendamento.id} className="first-letter:uppercase">
+                            {quandoEm(o.agendamento.inicio)} ({o.agendamento.servicoNome})
+                          </li>
+                        ) : (
+                          <li key={o.pedido.id} className="first-letter:uppercase">
+                            {quandoEm(o.pedido.inicio)} (pedido sem resposta)
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                    <p className="mt-1">
+                      Se ela quer trocar, toque em “Trocar horário”: fica um só atendimento e o
+                      horário de {quandoEm(inicioDoOutro(trocar))} fica livre.
+                    </p>
+                  </div>
+                )}
                 {erros[p.id] && (
                   <p role="alert" className="text-erro">
                     {erros[p.id]}
@@ -155,13 +203,28 @@ export default function PedidosPendentes() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-3">
-                    <Botao onClick={() => aprovar(p)} disabled={ocupado === p.id}>
-                      {ocupado === p.id
-                        ? 'Aprovando…'
-                        : expirado
-                          ? 'Aprovar mesmo assim'
-                          : 'Aprovar'}
-                    </Botao>
+                    {trocar ? (
+                      <>
+                        <Botao onClick={() => aprovar(p, trocar)} disabled={ocupado === p.id}>
+                          {ocupado === p.id ? 'Aprovando…' : 'Trocar horário'}
+                        </Botao>
+                        <Botao
+                          variante="secundario"
+                          onClick={() => aprovar(p)}
+                          disabled={ocupado === p.id}
+                        >
+                          Marcar mais um
+                        </Botao>
+                      </>
+                    ) : (
+                      <Botao onClick={() => aprovar(p)} disabled={ocupado === p.id}>
+                        {ocupado === p.id
+                          ? 'Aprovando…'
+                          : expirado
+                            ? 'Aprovar mesmo assim'
+                            : 'Aprovar'}
+                      </Botao>
+                    )}
                     <Botao variante="secundario" onClick={() => setRecusando(p.id)}>
                       Recusar
                     </Botao>

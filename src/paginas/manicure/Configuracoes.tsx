@@ -5,16 +5,20 @@ import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
 import Carregando from '../../componentes/Carregando';
 import FormularioConfiguracoes from '../../componentes/FormularioConfiguracoes';
+import FormularioPagamento from '../../componentes/FormularioPagamento';
 import Icone from '../../componentes/Icone';
 import {
   paraCampos,
   paraConfiguracoes,
   type DadosConfiguracoes,
 } from '../../dominio/configuracoes';
+import { paraCamposPagamento } from '../../dominio/pagamento';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useLinkAgendamento } from '../../hooks/useLinkAgendamento';
+import { usePagamento } from '../../hooks/usePagamento';
 import { salvarConfiguracoes } from '../../servicos/configPublica';
 import { copiarTexto } from '../../servicos/encurtador';
+import { salvarPagamento } from '../../servicos/pagamento';
 
 /** Link curto da página pública, pronto para colar no WhatsApp ou no Instagram (RF08). */
 function LinkParaClientes({ slug }: { slug: string }) {
@@ -63,6 +67,33 @@ function LinkParaClientes({ slug }: { slug: string }) {
   );
 }
 
+/** Chave Pix e sinal (RF10): ficam em `config/pagamento`, que só a manicure lê. */
+function SinalPeloPix() {
+  const { pagamento, carregando, erro } = usePagamento();
+  const [aviso, setAviso] = useState<string>();
+
+  if (carregando) return <Carregando texto="Carregando o Pix…" />;
+  if (erro) {
+    return (
+      <p role="alert" className="mb-6 text-erro">
+        Não foi possível carregar a chave Pix. Confira a internet e tente de novo.
+      </p>
+    );
+  }
+  return (
+    <>
+      <FormularioPagamento
+        inicial={paraCamposPagamento(pagamento)}
+        aoEnviar={(dados) => {
+          salvarPagamento(dados);
+          setAviso('Sinal pelo Pix salvo.');
+        }}
+      />
+      <Aviso texto={aviso} />
+    </>
+  );
+}
+
 /** `/mais/configuracoes` (RF04): espaço, expediente e regras do agendamento público. */
 export default function Configuracoes() {
   const navegar = useNavigate();
@@ -85,6 +116,7 @@ export default function Configuracoes() {
       ) : (
         <>
           <LinkParaClientes slug={config.slug} />
+          <SinalPeloPix />
           <FormularioConfiguracoes
             inicial={paraCampos(config)}
             aoEnviar={salvar}

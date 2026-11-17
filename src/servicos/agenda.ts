@@ -37,6 +37,7 @@ const paraAgendamento = (id: string, d: DocumentData): Agendamento => ({
   travas: Array.isArray(d.travas) ? d.travas.map(String) : [],
   status: (['cancelado', 'realizado', 'falta'] as const).find((s) => s === d.status) ?? 'marcado',
   precoCentavos: typeof d.precoCentavos === 'number' ? d.precoCentavos : undefined,
+  sinalCentavos: typeof d.sinalCentavos === 'number' ? d.sinalCentavos : undefined,
   observacao: String(d.observacao ?? ''),
   lembreteEnviado: d.lembreteEm instanceof Timestamp,
 });
@@ -69,6 +70,19 @@ export function observarAgendamento(
   return onSnapshot(
     doc(agendamentos, id),
     (snap) => aoMudar(snap.exists() ? paraAgendamento(snap.id, snap.data()) : null),
+    aoFalhar,
+  );
+}
+
+/** Atendimentos de uma cliente pelo WhatsApp (sem índice composto: filtre status e data). */
+export function observarAgendamentosDaCliente(
+  whatsapp: string,
+  aoMudar: (agendamentos: Agendamento[]) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(agendamentos, where('clienteWhatsapp', '==', whatsapp)),
+    (snap) => aoMudar(snap.docs.map((d) => paraAgendamento(d.id, d.data()))),
     aoFalhar,
   );
 }

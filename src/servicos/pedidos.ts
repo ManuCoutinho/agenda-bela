@@ -1,6 +1,7 @@
 import { FirebaseError } from 'firebase/app';
 import {
   collection,
+  deleteField,
   doc,
   onSnapshot,
   query,
@@ -18,6 +19,7 @@ import {
   HorarioJaPedido,
   pedidoExpirado,
   type DadosPedido,
+  type OutroHorario,
   type Pedido,
   type StatusPedido,
 } from '../dominio/pedidos';
@@ -122,17 +124,63 @@ export function observarPedidosPendentes(
 export async function aprovarPedido(
   pedido: Pedido,
   servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number },
-  clienteId?: string,
+  {
+    clienteId,
+    substitui,
+    sinalCentavos,
+  }: {
+    clienteId?: string;
+    /** Troca de horário: o atendimento ou pedido antigo da cliente. */
+    substitui?: OutroHorario;
+    /** Sinal pedido na confirmação (não se aplica à troca). */
+    sinalCentavos?: number;
+  } = {},
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const agora = new Date();
     const expirado = pedidoExpirado(pedido, agora);
+    const antigas = travasQueSaem(substitui, agora);
     for (const id of pedido.travas) {
+      if (antigas.includes(id)) continue;
       const snap = await tx.get(doc(travas, id));
       const expiraEm = snap.exists() ? paraData(snap.data().expiraEm) : undefined;
       // dentro das 24 h a trava pendente é deste pedido; depois, só se ficou livre
       const nossa = !expirado && expiraEm !== null && expiraEm !== undefined;
       if (!nossa && !travaLivre(expiraEm, agora)) throw new HorarioOcupado();
+    }
+
+    for (const id of pedido.travas) {
+      const [data, hora] = id.split('_');
+      tx.set(doc(travas, id), { data, hora, expiraEm: null });
+    }
+    for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
+      tx.delete(doc(travas, id));
+    }
+    tx.update(doc(pedidos, pedido.id), { status: 'aprovado', respondidoEm: serverTimestamp() });
+
+    const dadosDoServico = {
+      servicoId: servico.id,
+      servicoNome: servico.nome,
+      duracaoMin: servico.duracaoMin,
+      ...(servico.precoCentavos === undefined ? {} : { precoCentavos: servico.precoCentavos }),
+      inicio: Timestamp.fromDate(pedido.inicio),
+      travas: pedido.travas,
+      pedidoId: pedido.id,
+      atualizadoEm: serverTimestamp(),
+    };
+    if (substitui?.tipo === 'agendamento') {
+      // o atendimento muda de horário: o lembrete do dia antigo não vale mais
+      tx.update(doc(agendamentos, substitui.agendamento.id), {
+        ...dadosDoServico,
+        lembreteEm: deleteField(),
+      });
+      return;
+    }
+    if (substitui?.tipo === 'pedido') {
+      tx.update(doc(pedidos, substitui.pedido.id), {
+        status: 'recusado',
+        respondidoEm: serverTimestamp(),
+      });
     }
 
     const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes);
@@ -146,28 +194,29 @@ export async function aprovarPedido(
         atualizadoEm: serverTimestamp(),
       });
     }
-    for (const id of pedido.travas) {
-      const [data, hora] = id.split('_');
-      tx.set(doc(travas, id), { data, hora, expiraEm: null });
-    }
     tx.set(doc(agendamentos), {
       clienteId: cliente.id,
       clienteNome: pedido.nome,
       clienteWhatsapp: pedido.whatsapp,
-      servicoId: servico.id,
-      servicoNome: servico.nome,
-      duracaoMin: servico.duracaoMin,
-      ...(servico.precoCentavos === undefined ? {} : { precoCentavos: servico.precoCentavos }),
-      inicio: Timestamp.fromDate(pedido.inicio),
-      travas: pedido.travas,
+      ...dadosDoServico,
+      ...(sinalCentavos === undefined ? {} : { sinalCentavos }),
       status: 'marcado',
       observacao: '',
-      pedidoId: pedido.id,
       criadoEm: serverTimestamp(),
-      atualizadoEm: serverTimestamp(),
     });
-    tx.update(doc(pedidos, pedido.id), { status: 'aprovado', respondidoEm: serverTimestamp() });
   });
+}
+
+/**
+ * Travas do horário substituído que podem ser apagadas: as do atendimento, e
+ * as do pedido antigo só dentro das 24 h (depois podem ser de outra pessoa).
+ */
+function travasQueSaem(substitui: OutroHorario | undefined, agora: Date): string[] {
+  if (substitui?.tipo === 'agendamento') return substitui.agendamento.travas;
+  if (substitui?.tipo === 'pedido' && !pedidoExpirado(substitui.pedido, agora)) {
+    return substitui.pedido.travas;
+  }
+  return [];
 }
 
 /**

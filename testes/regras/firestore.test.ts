@@ -100,6 +100,14 @@ describe('dados privados (RNF07)', () => {
     await assertFails(visitante().doc('config/privado').get());
     await assertFails(visitante().doc('config/publico').set({ nome: 'x' }));
   });
+
+  it('chave Pix (config/pagamento): só a manicure lê e grava', async () => {
+    const pagamento = { chavePix: 'ana@pix.com', sinalPercentual: 50 };
+    await assertSucceeds(manicure().doc('config/pagamento').set(pagamento));
+    await assertSucceeds(manicure().doc('config/pagamento').get());
+    await assertFails(visitante().doc('config/pagamento').get());
+    await assertFails(visitante().doc('config/pagamento').set(pagamento));
+  });
 });
 
 describe('travas (RNF08)', () => {

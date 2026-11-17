@@ -6,6 +6,7 @@ import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import type { Pedido } from '../../dominio/pedidos';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
+import { usePagamento } from '../../hooks/usePagamento';
 import { useAgendamentosDasClientes, usePedidosPendentes } from '../../hooks/usePedidos';
 import { useServicos } from '../../hooks/useServicos';
 import { aprovarPedido, descartarPedido, recusarPedido } from '../../servicos/pedidos';
@@ -18,6 +19,7 @@ vi.mock('../../hooks/usePedidos', () => ({
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
+vi.mock('../../hooks/usePagamento', () => ({ usePagamento: vi.fn() }));
 vi.mock('../../servicos/pedidos', () => ({
   aprovarPedido: vi.fn(),
   recusarPedido: vi.fn(),
@@ -48,6 +50,11 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       erro: false,
     });
     vi.mocked(useAgendamentosDasClientes).mockReturnValue([]);
+    vi.mocked(usePagamento).mockReturnValue({
+      pagamento: { chavePix: '', sinalPercentual: 50 },
+      carregando: false,
+      erro: false,
+    });
     vi.mocked(useServicos).mockReturnValue({ servicos: [MAO], carregando: false, erro: false });
     vi.mocked(useClientes).mockReturnValue({
       clientes: [
@@ -79,7 +86,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
     expect(screen.getByText('terça-feira, 1 de dezembro, às 09:00')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
-    expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, 'c1', undefined);
+    expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, { clienteId: 'c1' });
     expect(await screen.findByRole('status')).toHaveTextContent('Ana: aprovado');
     const link = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
     expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
@@ -144,9 +151,12 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       expect(screen.queryByRole('button', { name: 'Aprovar' })).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Trocar horário' }));
-      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, 'c1', {
-        tipo: 'agendamento',
-        agendamento: MARCADO,
+      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
+        clienteId: 'c1',
+        substitui: {
+          tipo: 'agendamento',
+          agendamento: MARCADO,
+        },
       });
       expect(await screen.findByRole('status')).toHaveTextContent('Ana: horário trocado na agenda');
       const link = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
@@ -159,7 +169,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
     it('"Marcar mais um" aprova sem mexer no horário que ela já tem', async () => {
       render(<PedidosPendentes />);
       await userEvent.click(screen.getByRole('button', { name: 'Marcar mais um' }));
-      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, 'c1', undefined);
+      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, { clienteId: 'c1' });
       expect(await screen.findByRole('status')).toHaveTextContent('Ana: aprovado');
     });
 
@@ -177,10 +187,53 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       ).toBeInTheDocument();
       const [, doNovo] = screen.getAllByRole('button', { name: 'Trocar horário' });
       if (doNovo) await userEvent.click(doNovo);
-      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, 'c1', {
-        tipo: 'pedido',
-        pedido: anterior,
+      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
+        clienteId: 'c1',
+        substitui: {
+          tipo: 'pedido',
+          pedido: anterior,
+        },
       });
+    });
+  });
+
+  describe('aprovar com sinal pelo Pix', () => {
+    it('sem chave Pix, o botão fica desabilitado e explica onde cadastrar', () => {
+      render(<PedidosPendentes />);
+      const botao = screen.getByRole('button', { name: 'Aprovar com sinal' });
+      expect(botao).toBeDisabled();
+      expect(botao).toHaveAccessibleDescription(
+        'Para aprovar com sinal, cadastre a chave Pix em Mais › Configurações.',
+      );
+    });
+
+    it('serviço sem preço não oferece sinal', () => {
+      vi.mocked(useServicos).mockReturnValue({
+        servicos: [{ ...MAO, precoCentavos: 0 }],
+        carregando: false,
+        erro: false,
+      });
+      render(<PedidosPendentes />);
+      expect(screen.queryByRole('button', { name: 'Aprovar com sinal' })).not.toBeInTheDocument();
+    });
+
+    it('grava o sinal e manda a mensagem com o valor e a chave', async () => {
+      vi.mocked(usePagamento).mockReturnValue({
+        pagamento: { chavePix: 'ana@pix.com', sinalPercentual: 50 },
+        carregando: false,
+        erro: false,
+      });
+      vi.mocked(aprovarPedido).mockResolvedValue();
+      render(<PedidosPendentes />);
+      await userEvent.click(screen.getByRole('button', { name: 'Aprovar com sinal' }));
+      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
+        clienteId: 'c1',
+        sinalCentavos: 1750,
+      });
+      const link = await screen.findByRole('link', { name: 'Enviar confirmação no WhatsApp' });
+      expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
+        'peço um sinal de R$ 17,50 (50% do valor) pelo Pix. Chave: ana@pix.com.',
+      );
     });
   });
 });

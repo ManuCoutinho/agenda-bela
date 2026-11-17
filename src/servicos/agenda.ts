@@ -37,6 +37,7 @@ const paraAgendamento = (id: string, d: DocumentData): Agendamento => ({
   travas: Array.isArray(d.travas) ? d.travas.map(String) : [],
   status: (['cancelado', 'realizado', 'falta'] as const).find((s) => s === d.status) ?? 'marcado',
   precoCentavos: typeof d.precoCentavos === 'number' ? d.precoCentavos : undefined,
+  sinalCentavos: typeof d.sinalCentavos === 'number' ? d.sinalCentavos : undefined,
   observacao: String(d.observacao ?? ''),
   lembreteEnviado: d.lembreteEm instanceof Timestamp,
 });

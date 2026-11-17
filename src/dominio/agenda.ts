@@ -31,6 +31,8 @@ export type Agendamento = {
   observacao: string;
   /** Preço do serviço no dia em que foi marcado (para o painel do mês). */
   precoCentavos?: number;
+  /** Sinal pedido pelo Pix ao aprovar o pedido (RF10). */
+  sinalCentavos?: number;
   /** A manicure já tocou em "Enviar lembrete" (RF11). */
   lembreteEnviado?: boolean;
 };

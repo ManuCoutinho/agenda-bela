@@ -124,8 +124,17 @@ export function observarPedidosPendentes(
 export async function aprovarPedido(
   pedido: Pedido,
   servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number },
-  clienteId?: string,
-  substitui?: OutroHorario,
+  {
+    clienteId,
+    substitui,
+    sinalCentavos,
+  }: {
+    clienteId?: string;
+    /** Troca de horário: o atendimento ou pedido antigo da cliente. */
+    substitui?: OutroHorario;
+    /** Sinal pedido na confirmação (não se aplica à troca). */
+    sinalCentavos?: number;
+  } = {},
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const agora = new Date();
@@ -190,6 +199,7 @@ export async function aprovarPedido(
       clienteNome: pedido.nome,
       clienteWhatsapp: pedido.whatsapp,
       ...dadosDoServico,
+      ...(sinalCentavos === undefined ? {} : { sinalCentavos }),
       status: 'marcado',
       observacao: '',
       criadoEm: serverTimestamp(),

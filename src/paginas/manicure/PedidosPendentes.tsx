@@ -14,10 +14,12 @@ import {
   type OutroHorario,
   type Pedido,
 } from '../../dominio/pedidos';
+import { textoConfirmacaoComSinal, valorSinal } from '../../dominio/pagamento';
 import { formatarDuracao, type Servico } from '../../dominio/servicos';
 import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
+import { usePagamento } from '../../hooks/usePagamento';
 import { useAgendamentosDasClientes, usePedidosPendentes } from '../../hooks/usePedidos';
 import { useServicos } from '../../hooks/useServicos';
 import { aprovarPedido, descartarPedido, recusarPedido } from '../../servicos/pedidos';
@@ -40,6 +42,7 @@ export default function PedidosPendentes() {
   const { servicos } = useServicos();
   const { clientes } = useClientes();
   const { config } = useConfiguracoes();
+  const { pagamento } = usePagamento();
   const agendamentosDasClientes = useAgendamentosDasClientes(pedidos.map((p) => p.whatsapp));
   const [respostas, setRespostas] = useState<Resposta[]>([]);
   const [ocupado, setOcupado] = useState<string>();
@@ -48,7 +51,9 @@ export default function PedidosPendentes() {
 
   if (pedidos.length === 0 && respostas.length === 0) return null;
 
-  const servicoDe = (p: Pedido): Pick<Servico, 'id' | 'nome' | 'duracaoMin'> =>
+  const servicoDe = (
+    p: Pedido,
+  ): Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number } =>
     servicos.find((s) => s.id === p.servicoId) ?? {
       id: p.servicoId,
       nome: 'Serviço',
@@ -63,13 +68,20 @@ export default function PedidosPendentes() {
       ]),
     );
 
-  async function aprovar(p: Pedido, substitui?: OutroHorario) {
+  async function aprovar(
+    p: Pedido,
+    { substitui, comSinal = false }: { substitui?: OutroHorario; comSinal?: boolean } = {},
+  ) {
     const servico = servicoDe(p);
+    const sinalCentavos =
+      comSinal && servico.precoCentavos
+        ? valorSinal(servico.precoCentavos, pagamento.sinalPercentual)
+        : undefined;
     setOcupado(p.id);
     definirErro(p.id);
     try {
       const cliente = clientes.find((c) => c.whatsapp === p.whatsapp);
-      await aprovarPedido(p, servico, cliente?.id, substitui);
+      await aprovarPedido(p, servico, { clienteId: cliente?.id, substitui, sinalCentavos });
       const mensagem = {
         nome: p.nome,
         servico: servico.nome,
@@ -78,7 +90,14 @@ export default function PedidosPendentes() {
       };
       const texto = substitui
         ? textoTroca({ ...mensagem, antes: quandoEm(inicioDoOutro(substitui)) })
-        : textoConfirmacao(mensagem);
+        : sinalCentavos
+          ? textoConfirmacaoComSinal({
+              ...mensagem,
+              sinalCentavos,
+              percentual: pagamento.sinalPercentual,
+              chavePix: pagamento.chavePix,
+            })
+          : textoConfirmacao(mensagem);
       responder({
         pedido: p,
         tipo: substitui ? 'trocado' : 'aprovado',
@@ -205,7 +224,10 @@ export default function PedidosPendentes() {
                   <div className="flex flex-wrap gap-3">
                     {trocar ? (
                       <>
-                        <Botao onClick={() => aprovar(p, trocar)} disabled={ocupado === p.id}>
+                        <Botao
+                          onClick={() => aprovar(p, { substitui: trocar })}
+                          disabled={ocupado === p.id}
+                        >
                           {ocupado === p.id ? 'Aprovando…' : 'Trocar horário'}
                         </Botao>
                         <Botao
@@ -217,13 +239,25 @@ export default function PedidosPendentes() {
                         </Botao>
                       </>
                     ) : (
-                      <Botao onClick={() => aprovar(p)} disabled={ocupado === p.id}>
-                        {ocupado === p.id
-                          ? 'Aprovando…'
-                          : expirado
-                            ? 'Aprovar mesmo assim'
-                            : 'Aprovar'}
-                      </Botao>
+                      <>
+                        <Botao onClick={() => aprovar(p)} disabled={ocupado === p.id}>
+                          {ocupado === p.id
+                            ? 'Aprovando…'
+                            : expirado
+                              ? 'Aprovar mesmo assim'
+                              : 'Aprovar'}
+                        </Botao>
+                        {Boolean(servico.precoCentavos) && (
+                          <Botao
+                            variante="secundario"
+                            onClick={() => aprovar(p, { comSinal: true })}
+                            disabled={ocupado === p.id || !pagamento.chavePix}
+                            aria-describedby={pagamento.chavePix ? undefined : `sem-pix-${p.id}`}
+                          >
+                            Aprovar com sinal
+                          </Botao>
+                        )}
+                      </>
                     )}
                     <Botao variante="secundario" onClick={() => setRecusando(p.id)}>
                       Recusar
@@ -232,6 +266,11 @@ export default function PedidosPendentes() {
                       <Botao variante="texto" onClick={() => descartarPedido(p)}>
                         Descartar
                       </Botao>
+                    )}
+                    {!trocar && Boolean(servico.precoCentavos) && !pagamento.chavePix && (
+                      <p id={`sem-pix-${p.id}`} className="w-full text-texto-suave">
+                        Para aprovar com sinal, cadastre a chave Pix em Mais › Configurações.
+                      </p>
                     )}
                   </div>
                 )}

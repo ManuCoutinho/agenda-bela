@@ -6,9 +6,18 @@ import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { salvarConfiguracoes } from '../../servicos/configPublica';
 import { copiarTexto } from '../../servicos/encurtador';
+import { salvarPagamento } from '../../servicos/pagamento';
 import Configuracoes from './Configuracoes';
 
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
+vi.mock('../../hooks/usePagamento', () => ({
+  usePagamento: () => ({
+    pagamento: { chavePix: '', sinalPercentual: 50 },
+    carregando: false,
+    erro: false,
+  }),
+}));
+vi.mock('../../servicos/pagamento', () => ({ salvarPagamento: vi.fn() }));
 vi.mock('../../servicos/configPublica', () => ({ salvarConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/encurtador', () => ({ copiarTexto: vi.fn() }));
 vi.mock('../../hooks/useLinkAgendamento', () => ({
@@ -38,6 +47,7 @@ const grupoDoDia = (dia: string) => screen.getByRole('group', { name: dia });
 describe('Configurações (RF04)', () => {
   beforeEach(() => {
     vi.mocked(salvarConfiguracoes).mockReset();
+    vi.mocked(salvarPagamento).mockReset();
     vi.mocked(useConfiguracoes).mockReturnValue({
       config: CONFIGURACOES_PADRAO,
       carregando: false,
@@ -129,5 +139,23 @@ describe('Configurações (RF04)', () => {
     });
     renderizar();
     expect(screen.getByRole('alert')).toHaveTextContent('Confira a internet');
+  });
+
+  it('salva a chave Pix e o sinal à parte, sem sair da tela', async () => {
+    renderizar();
+    await userEvent.type(screen.getByLabelText('Chave Pix'), ' ana@pix.com ');
+    const percentual = screen.getByLabelText('Sinal (% do valor do serviço)');
+    await userEvent.clear(percentual);
+    await userEvent.type(percentual, '150');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar sinal' }));
+    expect(salvarPagamento).not.toHaveBeenCalled();
+    expect(screen.getByText('O sinal deve ser de 1% a 100%.')).toBeInTheDocument();
+
+    await userEvent.clear(percentual);
+    await userEvent.type(percentual, '30');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar sinal' }));
+    expect(salvarPagamento).toHaveBeenCalledWith({ chavePix: 'ana@pix.com', sinalPercentual: 30 });
+    expect(await screen.findByText('Sinal pelo Pix salvo.')).toBeInTheDocument();
+    expect(salvarConfiguracoes).not.toHaveBeenCalled();
   });
 });

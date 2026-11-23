@@ -1,9 +1,9 @@
 // Gera as regras publicáveis a partir de `firestore.rules`, trocando o marcador
-// pelo UID da manicure. O UID fica fora do Git: variável `UID_MANICURE` no
+// pelo UID da manicure. O UID fica fora do Git: variável `UID_OWNER` no
 // ambiente ou no `.env.local`. Roda sozinho antes de `firebase deploy --only
 // firestore` (predeploy no firebase.json).
 //
-//   node scripts/gerar-regras.mjs           UID de UID_MANICURE (deploy, emulador)
+//   node scripts/gerar-regras.mjs           UID de UID_OWNER (deploy, emulador)
 //   node scripts/gerar-regras.mjs --teste   UID fictício (testes de regras no CI)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -24,12 +24,12 @@ function lerDoEnvLocal(nome) {
 }
 
 const teste = process.argv.includes('--teste');
-const uid = teste ? UID_DE_TESTE : (process.env.UID_MANICURE ?? lerDoEnvLocal('UID_MANICURE'));
+const uid = teste ? UID_DE_TESTE : (process.env.UID_OWNER ?? lerDoEnvLocal('UID_OWNER'));
 
 if (!uid || !/^[A-Za-z0-9_-]{6,128}$/.test(uid)) {
   console.error(
     'Falta o UID da manicure. Copie em Firebase → Authentication → Usuários e coloque no ' +
-      '.env.local uma linha UID_MANICURE=<uid>. Depois rode o comando de novo.',
+      '.env.local uma linha UID_OWNER=<uid>. Depois rode o comando de novo.',
   );
   process.exit(1);
 }

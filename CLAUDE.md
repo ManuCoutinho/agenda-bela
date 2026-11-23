@@ -23,8 +23,8 @@ firebase deploy --only firestore   # regras: deploy manual, nunca pelo CI (gera 
 
 - Node via nvm; o Firebase CLI está instalado no Node 22.14.0. Em shells não interativos, rode `source ~/.nvm/nvm.sh && nvm use 22.14.0` antes de `pnpm`/`firebase`.
 - Firebase CLI logado em `espacojuju.unhas@gmail.com`; projeto `agenda-bela-bb595` (`.firebaserc`).
-- `.env.local` (fora do Git) já tem a configuração `VITE_FIREBASE_*` e o `UID_MANICURE`. `VITE_USAR_EMULADOR=true` aponta o app para o emulador.
-- UID da manicure fora do Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`; `scripts/gerar-regras.mjs` gera `.firebase/firestore.rules` (predeploy do `firebase deploy`, `pnpm regras:gerar` antes de subir o emulador; `--teste` usa um UID fictício). Trocar a dona = trocar `UID_MANICURE` e publicar.
+- `.env.local` (fora do Git) já tem a configuração `VITE_FIREBASE_*` e o `UID_OWNER`. `VITE_USAR_EMULADOR=true` aponta o app para o emulador.
+- UID da manicure fora do Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`; `scripts/gerar-regras.mjs` gera `.firebase/firestore.rules` (predeploy do `firebase deploy`, `pnpm regras:gerar` antes de subir o emulador; `--teste` usa um UID fictício). Trocar a dona = trocar `UID_OWNER` e publicar.
 - Pelo Windows (caminho `\\wsl.localhost\…`) o Git recusa o repositório por "dubious ownership": use `git -c safe.directory=* …` ou rode pelo WSL (`wsl.exe -d Ubuntu-24.04 -- bash -lc 'cd ~/www/agenda-bela && …'`).
 
 ## Git

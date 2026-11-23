@@ -30,3 +30,4 @@ dist-ssr
 # Plano local
 /docs/
 .env*.local
+/.playwright-mcp/

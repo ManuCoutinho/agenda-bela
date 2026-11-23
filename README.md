@@ -37,7 +37,7 @@ Variáveis do `.env.local`:
 | Variável                  | Para quê                                                                  |
 | ------------------------- | ------------------------------------------------------------------------- |
 | `VITE_FIREBASE_*`         | Configuração do app Web (console do Firebase → Configurações do projeto). |
-| `UID_MANICURE`            | UID da conta dona; entra nas regras do Firestore quando elas são geradas. |
+| `UID_OWNER`            | UID da conta dona; entra nas regras do Firestore quando elas são geradas. |
 | `VITE_USAR_EMULADOR=true` | Aponta o app para o emulador local em vez do Firebase real.               |
 
 ## Comandos
@@ -49,7 +49,7 @@ Variáveis do `.env.local`:
 | `pnpm test`         | Testes de domínio e telas (Vitest, jsdom).             |
 | `pnpm test:regras`  | Testes do `firestore.rules` no emulador.               |
 | `pnpm build`        | Checagem de tipos e build de produção em `dist/`.      |
-| `pnpm regras:gerar` | Gera `.firebase/firestore.rules` com o `UID_MANICURE`. |
+| `pnpm regras:gerar` | Gera `.firebase/firestore.rules` com o `UID_OWNER`. |
 
 ## Estrutura
 
@@ -76,7 +76,7 @@ As dependências só apontam para baixo (páginas → componentes/hooks → serv
 | `pedidos`                                                  | A cliente cria (campos validados); só a dona lê e responde. |
 | `travas` (`AAAA-MM-DD_HHmm`)                               | Impedem dois pedidos no mesmo horário.                      |
 
-O UID da dona não fica no Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`, trocado por `scripts/gerar-regras.mjs` antes do deploy. Trocar a dona é mudar `UID_MANICURE` e publicar as regras.
+O UID da dona não fica no Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`, trocado por `scripts/gerar-regras.mjs` antes do deploy. Trocar a dona é mudar `UID_OWNER` e publicar as regras.
 
 ## Deploy
 

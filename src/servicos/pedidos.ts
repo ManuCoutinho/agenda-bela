@@ -246,6 +246,10 @@ export async function aprovarPedido(
     const status = atual.data()?.status;
     // já virou atendimento (outra aba ou outra abertura do app): nada a fazer
     if (status !== 'pendente' && status !== 'confirmado') return;
+    // cliente nova tem id fixo pelo WhatsApp: várias datas convertidas ao mesmo tempo
+    // (horário fixo) caem na mesma cliente em vez de criar uma por data
+    const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes, `wa-${pedido.whatsapp}`);
+    const clienteExiste = clienteId ? true : (await tx.get(cliente)).exists();
     const expirado = status === 'pendente' && pedidoExpirado(pedido, agora);
     const antigas = travasQueSaem(substitui, agora);
     for (const id of pedido.travas) {
@@ -308,11 +312,10 @@ export async function aprovarPedido(
       });
     }
 
-    const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes);
-    if (clienteId && pedido.chave) {
+    if (clienteExiste && pedido.chave) {
       tx.update(cliente, { chaves: arrayUnion(pedido.chave) });
     }
-    if (!clienteId) {
+    if (!clienteExiste) {
       tx.set(cliente, {
         nome: pedido.nome,
         whatsapp: pedido.whatsapp,

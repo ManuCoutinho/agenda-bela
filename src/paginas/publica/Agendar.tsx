@@ -65,6 +65,7 @@ import { usePortal } from '../../hooks/usePortal';
 import {
   chaveParaMarcar,
   esquecerCliente,
+  esquecerHorarioLocal,
   guardarCancelamentoPedido,
   guardarHorariosLocais,
   guardarTrocado,
@@ -225,6 +226,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
         antigo,
       });
       guardarTrocado(antigo.id);
+      esquecerHorarioLocal(antigo.inicio);
       guardarHorariosLocais([
         {
           inicio: inicioEm(dia, hora).toISOString(),

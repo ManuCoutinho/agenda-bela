@@ -333,6 +333,11 @@ describe('Página pública (RF08, RF09)', () => {
     });
 
     it('remarca na hora: escolhe o dia e a hora e confirma a troca', async () => {
+      // este celular marcou o horário antigo: a cópia local também precisa sumir
+      localStorage.setItem(
+        'agenda-bela:horarios',
+        JSON.stringify([{ inicio: longe.inicio.toISOString(), servico: 'Mão', duracaoMin: 60 }]),
+      );
       renderizar();
       await userEvent.click(screen.getByRole('button', { name: 'Remarcar' }));
       await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
@@ -349,6 +354,10 @@ describe('Página pública (RF08, RF09)', () => {
         }),
       );
       expect(await screen.findByRole('heading', { name: 'Horário trocado!' })).toBeInTheDocument();
+      const locais = JSON.parse(localStorage.getItem('agenda-bela:horarios') ?? '[]') as {
+        inicio: string;
+      }[];
+      expect(locais.map((h) => h.inicio)).toEqual([inicioEm('2026-12-01', '0900').toISOString()]);
     });
   });
 

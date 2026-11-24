@@ -77,3 +77,11 @@ export const guardarTrocado = (id: string) => gravar(CHAVE_TROCADOS, [...lerTroc
 export const lerCancelamentosPedidos = () => ler<string[]>(CHAVE_CANCELAMENTOS) ?? [];
 export const guardarCancelamentoPedido = (id: string) =>
   gravar(CHAVE_CANCELAMENTOS, [...lerCancelamentosPedidos(), id]);
+
+/** I14: depois de remarcar, a cópia local do horário antigo não vale mais. */
+export function esquecerHorarioLocal(inicio: Date) {
+  gravar(
+    CHAVE_HORARIOS,
+    lerHorariosLocais().filter((h) => Date.parse(h.inicio) !== inicio.getTime()),
+  );
+}

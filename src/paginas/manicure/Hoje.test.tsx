@@ -16,6 +16,7 @@ vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/bloqueios', () => ({ bloquearHorario: vi.fn() }));
 // os pedidos têm o próprio teste (PedidosPendentes.test.tsx)
 vi.mock('./PedidosPendentes', () => ({ default: () => null }));
+vi.mock('./AjusteHorarios', () => ({ default: () => null }));
 
 const ag = (id: string, hora: string, status: Agendamento['status'] = 'marcado'): Agendamento => ({
   id,
@@ -121,20 +122,20 @@ describe('Hoje (RF07)', () => {
       </MemoryRouter>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Bloquear o resto do dia' }));
-    expect(screen.getByText(/Bloquear das 15:30 às 22:00\?/)).toBeInTheDocument();
+    expect(screen.getByText(/Bloquear das 16:00 às 22:00\?/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Sim, bloquear' }));
 
     expect(bloquearHorario).toHaveBeenCalledWith(
       expect.objectContaining({
         data: '2026-11-10',
-        ini: '15:30',
+        ini: '16:00',
         fim: '22:00',
         descricao: 'Resto do dia',
-        travas: expect.arrayContaining(['2026-11-10_1530', '2026-11-10_2130']),
+        travas: expect.arrayContaining(['2026-11-10_1600', '2026-11-10_2100']),
       }),
       true,
     );
-    expect(await screen.findByText(/Bloqueado das 15:30 às 22:00/)).toBeInTheDocument();
+    expect(await screen.findByText(/Bloqueado das 16:00 às 22:00/)).toBeInTheDocument();
   });
 
   it('sem "Bloquear o resto do dia" quando o dia já acabou', () => {

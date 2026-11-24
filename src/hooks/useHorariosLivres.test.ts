@@ -30,7 +30,7 @@ describe('useHorariosLivres', () => {
   it('cruza as travas do dia com as regras', () => {
     const { result } = renderHook(() => useHorariosLivres('2026-12-01', 30, regras));
     expect(useOcupados).toHaveBeenLastCalledWith('2026-12-01');
-    expect(result.current.horarios).toEqual(['0900', '1000', '1030']);
+    expect(result.current.horarios).toEqual(['1000']); // a trava das 09:30 ocupa as 09h
   });
 
   it('sem serviço escolhido não consulta o dia', () => {

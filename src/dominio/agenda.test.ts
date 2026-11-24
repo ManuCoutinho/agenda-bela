@@ -35,10 +35,20 @@ describe('datas no fuso de São Paulo', () => {
 });
 
 describe('idsTravas (RF07)', () => {
-  it('ocupa blocos de 30 min pela duração mais o intervalo', () => {
-    expect(idsTravas(inicioEm('2026-12-01', '0900'), 60, 15)).toEqual([
+  it('ocupa as horas da duração mais o intervalo', () => {
+    expect(idsTravas(inicioEm('2026-12-01', '0900'), 60, 60)).toEqual([
       '2026-12-01_0900',
-      '2026-12-01_0930',
+      '2026-12-01_1000',
+    ]);
+    expect(idsTravas(inicioEm('2026-12-01', '0900'), 90, 0)).toEqual([
+      '2026-12-01_0900',
+      '2026-12-01_1000',
+    ]);
+  });
+
+  it('atendimento antigo que começa na meia hora ocupa as duas horas que toca', () => {
+    expect(idsTravas(inicioEm('2026-12-01', '0930'), 60, 0)).toEqual([
+      '2026-12-01_0900',
       '2026-12-01_1000',
     ]);
   });
@@ -61,22 +71,24 @@ describe('horariosParaMarcar', () => {
     const opcoes = horariosParaMarcar(new Set(['1000']), 60, 0, []);
     const porHora = Object.fromEntries(opcoes.map((o) => [o.hora, o.livre]));
     expect(porHora['0900']).toBe(true);
-    expect(porHora['0930']).toBe(false); // 09:30–10:30 pega o bloco das 10h
+    expect(porHora['0930']).toBeUndefined(); // só horas cheias
     expect(porHora['1000']).toBe(false);
-    expect(porHora['1030']).toBe(true);
+    expect(porHora['1100']).toBe(true);
+    const longo = horariosParaMarcar(new Set(['1000']), 90, 0, []);
+    expect(longo.find((o) => o.hora === '0900')?.livre).toBe(false); // 1 h 30 ocupa 2 h
   });
 
   it('o intervalo depois do atendimento também precisa estar livre', () => {
-    const opcoes = horariosParaMarcar(new Set(['1000']), 60, 30, []);
+    const opcoes = horariosParaMarcar(new Set(['1000']), 60, 60, []);
     const porHora = Object.fromEntries(opcoes.map((o) => [o.hora, o.livre]));
-    expect(porHora['0830']).toBe(true); // 08:30–09:30 + intervalo até 10:00
-    expect(porHora['0900']).toBe(false); // o intervalo cairia no bloco das 10h
+    expect(porHora['0800']).toBe(true); // 08:00–09:00 + intervalo até 10:00
+    expect(porHora['0900']).toBe(false); // o intervalo cairia na hora das 10h
   });
 
   it('vai das 6h até o último início que termina às 22h', () => {
     const opcoes = horariosParaMarcar(new Set(), 90, 0, []);
     expect(opcoes[0]?.hora).toBe('0600');
-    expect(opcoes.at(-1)?.hora).toBe('2030');
+    expect(opcoes.at(-1)?.hora).toBe('2000');
   });
 
   it('sinaliza o que fica fora do expediente e amplia a faixa se ele for maior', () => {
@@ -84,7 +96,7 @@ describe('horariosParaMarcar', () => {
     const noExpediente = Object.fromEntries(opcoes.map((o) => [o.hora, o.noExpediente]));
     expect(opcoes[0]?.hora).toBe('0500');
     expect(noExpediente['1100']).toBe(true); // 11h–12h cabe
-    expect(noExpediente['1130']).toBe(false); // passaria das 12h
+    expect(noExpediente['1200']).toBe(false); // passaria das 12h
     expect(noExpediente['1400']).toBe(false);
   });
 

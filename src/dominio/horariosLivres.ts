@@ -1,6 +1,14 @@
 import { dataDoDia, diaDaSemana, inicioEm, somarDias } from './agenda';
 import { expedienteDoDia, type Configuracoes } from './configuracoes';
-import { blocosNecessarios, emMinutos, hhmm, PASSO, type Recorrente } from './disponibilidade';
+import {
+  arredondarHora,
+  blocosNecessarios,
+  emMinutos,
+  hhmm,
+  PASSO,
+  porHora,
+  type Recorrente,
+} from './disponibilidade';
 
 /** O que a página pública precisa saber para oferecer horários (vem de `config/publico`). */
 export type RegrasHorario = Pick<
@@ -22,7 +30,7 @@ export const diasAbertos = (regras: RegrasHorario, agora: Date) =>
 
 /**
  * RN01–RN04: horários de início (HHmm) livres para a cliente no dia
- * (AAAA-MM-DD, fuso de São Paulo), de 30 em 30 min.
+ * (AAAA-MM-DD, fuso de São Paulo), de hora em hora.
  * - RN01: dentro do expediente; o serviço termina até o fim da faixa.
  * - RN02: trava ativa (atendimento, bloqueio ou pedido pendente) ocupa o horário.
  * - RN03: só a partir de agora + antecedência e até hoje + janela de dias.
@@ -45,15 +53,20 @@ export function horariosLivres(p: {
   const fixos = regras.recorrentes
     .filter((r) => r.dia === dia)
     .map((r) => ({ ini: emMinutos(r.ini), fim: emMinutos(r.fim) }));
+  const ocupados = porHora(p.ocupados);
   const tomado = (t: number) =>
-    p.ocupados.has(hhmm(t)) || fixos.some((f) => t >= f.ini && t < f.fim);
+    ocupados.has(hhmm(t)) || fixos.some((f) => f.ini < t + PASSO && f.fim > t);
 
   const minimo = p.agora.getTime() + regras.antecedenciaMin * 60_000;
   const total = blocosNecessarios(p.duracaoMin, regras.intervaloMin);
   const livres: string[] = [];
   for (const faixa of expedienteDoDia(regras.expediente, dia)) {
     const fim = emMinutos(faixa.fim);
-    for (let ini = emMinutos(faixa.ini); ini + p.duracaoMin <= fim; ini += PASSO) {
+    for (
+      let ini = arredondarHora(emMinutos(faixa.ini), true);
+      ini + p.duracaoMin <= fim;
+      ini += PASSO
+    ) {
       const inicio = inicioEm(p.data, hhmm(ini)).getTime();
       if (inicio <= p.agora.getTime() || inicio < minimo) continue;
       let livre = true;

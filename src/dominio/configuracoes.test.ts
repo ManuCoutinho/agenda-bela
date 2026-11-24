@@ -48,10 +48,17 @@ describe('esquemaConfiguracoes (RF04)', () => {
   });
 
   it('normaliza o WhatsApp e converte os dias abertos em faixas', () => {
-    const config = paraConfiguracoes(esquemaConfiguracoes.parse(campos({ intervaloMin: '30' })));
+    const config = paraConfiguracoes(esquemaConfiguracoes.parse(campos({ intervaloMin: '60' })));
     expect(config.whatsapp).toBe('5541988606636');
-    expect(config.intervaloMin).toBe(30);
+    expect(config.intervaloMin).toBe(60);
     expect(config.expediente).toEqual(CONFIGURACOES_PADRAO.expediente);
+    expect(mensagens(campos({ intervaloMin: '30' }))).toEqual([
+      'intervaloMin: Escolha uma opção da lista.',
+    ]);
+  });
+
+  it('intervalo antigo de 30 min aparece como 1 h (já reservava a hora seguinte)', () => {
+    expect(paraCampos({ ...CONFIGURACOES_PADRAO, intervaloMin: 30 }).intervaloMin).toBe('60');
   });
 
   it('volta ao formulário com os mesmos valores (ida e volta)', () => {

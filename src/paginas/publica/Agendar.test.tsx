@@ -129,7 +129,7 @@ describe('Página pública (RF08, RF09)', () => {
       whatsapp: '5541988606636',
       servicoId: 's1',
       inicio: inicioEm('2026-12-01', '0900'),
-      travas: ['2026-12-01_0900', '2026-12-01_0930', '2026-12-01_1000'],
+      travas: ['2026-12-01_0900', '2026-12-01_1000'], // 1 h + 30 min de intervalo = 2 h
     });
     expect(await screen.findByRole('heading', { name: 'Pedido enviado!' })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Avisar no WhatsApp' });

@@ -36,8 +36,8 @@ export type Configuracoes = {
   janelaDias: number;
 };
 
-/** Os horários andam em blocos de 30 min, então o intervalo também. */
-export const INTERVALOS_MIN = [0, 30, 60];
+/** Os horários andam de hora em hora, então o intervalo também. */
+export const INTERVALOS_MIN = [0, 60];
 export const ANTECEDENCIAS_MIN = [0, 60, 120, 240, 720, 1440, 2880];
 export const JANELAS_DIAS = [7, 14, 30, 60, 90];
 
@@ -172,7 +172,8 @@ export const paraCampos = (c: Configuracoes): CamposConfiguracoes => ({
       ? { aberto: true, ini: faixa.ini, fim: faixa.fim }
       : { aberto: false, ...DIA_PADRAO };
   }),
-  intervaloMin: String(c.intervaloMin),
+  // intervalo antigo de 30 min já reservava a hora seguinte inteira
+  intervaloMin: String(c.intervaloMin > 0 ? 60 : 0),
   antecedenciaMin: String(c.antecedenciaMin),
   janelaDias: String(c.janelaDias),
 });

@@ -48,7 +48,7 @@ const ATUAL: Agendamento = {
   servicoNome: 'Mão',
   duracaoMin: 60,
   inicio: inicioEm('2026-12-01', '1000'),
-  travas: ['2026-12-01_1000', '2026-12-01_1030'],
+  travas: ['2026-12-01_1000'],
   status: 'marcado',
   observacao: '',
 };
@@ -86,7 +86,7 @@ describe('EditarAtendimento (RF07)', () => {
     vi.mocked(useAgendamento).mockReturnValue({ dados: null, carregando: false, erro: false });
     vi.mocked(useBloqueios).mockReturnValue({ bloqueios: [], carregando: false, erro: false });
     vi.mocked(useOcupados).mockReturnValue({
-      dados: new Set(['1000', '1030']),
+      dados: new Set(['1000']),
       carregando: false,
       erro: false,
     });
@@ -103,7 +103,8 @@ describe('EditarAtendimento (RF07)', () => {
     renderizar('/atendimentos/novo?data=2026-12-01'); // terça
     await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
     expect(opcao('14:00 (ocupado)').disabled).toBe(true);
-    expect(opcao('13:30 (ocupado)').disabled).toBe(true); // 13:30–14:30 invade a terapia
+    expect(opcao('13:00').disabled).toBe(false); // termina às 14h, quando a terapia começa
+    expect(screen.queryByRole('option', { name: /13:30/ })).not.toBeInTheDocument();
     expect(opcao('15:00').disabled).toBe(false);
   });
 
@@ -118,7 +119,8 @@ describe('EditarAtendimento (RF07)', () => {
     await userEvent.selectOptions(screen.getByLabelText('Cliente'), 'Ana');
     await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
 
-    expect(opcao('09:30 (ocupado)').disabled).toBe(true); // 09:30–10:30 invade as 10h
+    expect(opcao('10:00 (ocupado)').disabled).toBe(true);
+    expect(screen.queryByRole('option', { name: /09:30/ })).not.toBeInTheDocument(); // só horas cheias
     expect(opcao('11:00').disabled).toBe(false);
     expect(opcao('08:00 (fora do expediente)').disabled).toBe(false); // encaixe permitido
 
@@ -130,7 +132,7 @@ describe('EditarAtendimento (RF07)', () => {
         clienteNome: 'Ana',
         servicoNome: 'Mão',
         inicio: inicioEm('2026-12-01', '0900'),
-        travas: ['2026-12-01_0900', '2026-12-01_0930'],
+        travas: ['2026-12-01_0900'],
         status: 'marcado',
       }),
       undefined,

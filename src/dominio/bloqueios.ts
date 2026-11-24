@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { dataDoDia, diaDaSemana, FAIXA_MARCACAO, horaDe, rotuloDia } from './agenda';
 import { DIAS_SEMANA } from './configuracoes';
-import { PASSO, type Faixa, type Recorrente } from './disponibilidade';
+import { arredondarHora, PASSO, type Faixa, type Recorrente } from './disponibilidade';
 
 /**
  * RF05/RF06. Horário em que a manicure não atende.
@@ -46,10 +46,10 @@ const paraHora = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const semDoisPontos = (hora: string) => hora.replace(':', '');
 
-/** IDs de trava (`AAAA-MM-DD_HHmm`) dos blocos de 30 min entre `ini` e `fim`. */
+/** IDs de trava (`AAAA-MM-DD_HH00`) das horas que o intervalo `ini`–`fim` toca. */
 export function travasDoIntervalo(data: string, ini: string, fim: string): string[] {
   const ids: string[] = [];
-  for (let t = emMinutos(ini); t < emMinutos(fim); t += PASSO) {
+  for (let t = arredondarHora(emMinutos(ini)); t < emMinutos(fim); t += PASSO) {
     ids.push(`${data}_${semDoisPontos(paraHora(t))}`);
   }
   return ids;
@@ -110,7 +110,7 @@ export const rotuloQuando = (b: Bloqueio) =>
     : rotuloDia(b.data);
 
 /**
- * "Bloquear o resto do dia": do próximo horário cheio ou meia hora até o fim
+ * "Bloquear o resto do dia": da próxima hora cheia até o fim
  * do dia (o maior entre 22h e o fim do expediente). `null` se o dia acabou.
  */
 export function restoDoDia(
@@ -119,14 +119,14 @@ export function restoDoDia(
 ): { data: string; ini: string; fim: string } | null {
   const hora = horaDe(agora);
   const minutos = Number(hora.slice(0, 2)) * 60 + Number(hora.slice(2));
-  const ini = Math.ceil(minutos / PASSO) * PASSO;
+  const ini = arredondarHora(minutos, true);
   const fim = Math.max(FAIXA_MARCACAO.fim, ...expedienteDoDia.map((f) => emMinutos(f.fim)));
   if (ini >= fim) return null;
   return { data: dataDoDia(agora), ini: paraHora(ini), fim: paraHora(fim) };
 }
 
 /** Horas de início/fim do formulário: 05:00 a 23:00, de 30 em 30 min. */
-export const HORAS_BLOQUEIO = Array.from({ length: 37 }, (_, i) => paraHora(5 * 60 + i * PASSO));
+export const HORAS_BLOQUEIO = Array.from({ length: 37 }, (_, i) => paraHora(5 * 60 + i * 30));
 
 export const esquemaBloqueio = z
   .object({

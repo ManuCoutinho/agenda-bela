@@ -16,6 +16,7 @@ import { useBloqueios } from '../../hooks/useBloqueios';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useLembretes } from '../../hooks/useLembretes';
 import { bloquearHorario } from '../../servicos/bloqueios';
+import AjusteHorarios from './AjusteHorarios';
 import PedidosPendentes from './PedidosPendentes';
 
 export default function Hoje() {
@@ -64,6 +65,7 @@ export default function Hoje() {
     <>
       <BarraSuperior titulo="Hoje" />
       <p className="mb-4 text-texto-suave first-letter:uppercase">{rotuloDia(hoje)}</p>
+      <AjusteHorarios />
       <PedidosPendentes />
       {lembretes.pendentes > 0 && (
         <section

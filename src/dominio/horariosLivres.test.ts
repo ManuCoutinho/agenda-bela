@@ -24,7 +24,14 @@ const livres = (o: Partial<Parameters<typeof horariosLivres>[0]> = {}) =>
 
 describe('horariosLivres (RN01–RN04)', () => {
   it('RN01: só dentro do expediente e com o serviço terminando até o fim', () => {
-    expect(livres()).toEqual(['0900', '0930', '1000', '1030', '1100']);
+    expect(livres()).toEqual(['0900', '1000', '1100']);
+  });
+
+  it('só horas cheias: expediente que começa às 09:30 oferece a partir das 10:00', () => {
+    const r = livres({
+      regras: { ...regras, expediente: [{ dia: 2, ini: '09:30', fim: '12:00' }] },
+    });
+    expect(r).toEqual(['1000', '1100']);
   });
 
   it('dia sem expediente não tem horário', () => {
@@ -32,12 +39,17 @@ describe('horariosLivres (RN01–RN04)', () => {
   });
 
   it('RN02: trava ativa ocupa o horário e quem invade ele', () => {
-    expect(livres({ ocupados: new Set(['1000']) })).toEqual(['0900', '1030', '1100']);
+    expect(livres({ ocupados: new Set(['1000']) })).toEqual(['0900', '1100']);
+    expect(livres({ duracaoMin: 90, ocupados: new Set(['1100']) })).toEqual(['0900']);
+  });
+
+  it('trava antiga de meia hora ocupa a hora inteira', () => {
+    expect(livres({ ocupados: new Set(['1030']) })).toEqual(['0900', '1100']);
   });
 
   it('RN04: o intervalo depois do serviço também precisa estar livre', () => {
-    const r = livres({ regras: { ...regras, intervaloMin: 30 }, ocupados: new Set(['1100']) });
-    expect(r).toEqual(['0900', '0930']); // 10:00 + 1 h + 30 min chega às 11h
+    const r = livres({ regras: { ...regras, intervaloMin: 60 }, ocupados: new Set(['1100']) });
+    expect(r).toEqual(['0900']); // 10:00 + 1 h + 1 h de intervalo chega às 11h
   });
 
   it('bloqueio fixo da semana conta como ocupado', () => {
@@ -45,6 +57,10 @@ describe('horariosLivres (RN01–RN04)', () => {
       regras: { ...regras, recorrentes: [{ dia: 2, ini: '10:00', fim: '11:00' }] },
     });
     expect(r).toEqual(['0900', '1100']);
+    const meia = livres({
+      regras: { ...regras, recorrentes: [{ dia: 2, ini: '10:30', fim: '11:00' }] },
+    });
+    expect(meia).toEqual(['0900', '1100']);
   });
 
   it('RN03: respeita a antecedência no fuso de São Paulo', () => {
@@ -53,11 +69,11 @@ describe('horariosLivres (RN01–RN04)', () => {
       regras: { ...regras, antecedenciaMin: 60 },
       agora: new Date('2026-12-01T12:00:00Z'),
     });
-    expect(r).toEqual(['1000', '1030', '1100']);
+    expect(r).toEqual(['1000', '1100']);
   });
 
   it('RN03: sem antecedência, horário que já passou não aparece', () => {
-    expect(livres({ agora: new Date('2026-12-01T13:10:00Z') })).toEqual(['1030', '1100']);
+    expect(livres({ agora: new Date('2026-12-01T13:10:00Z') })).toEqual(['1100']);
   });
 
   it('RN03: nada além da janela de dias', () => {

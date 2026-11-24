@@ -161,7 +161,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       primeiro?.addEventListener('click', (e) => e.preventDefault());
       if (primeiro) await userEvent.click(primeiro);
       expect(marcarAvisado).toHaveBeenCalledTimes(1);
-      expect(marcarAvisado).toHaveBeenCalledWith('p1');
+      expect(marcarAvisado).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p1' }));
 
       // o WhatsApp abriu e o app recarregou: a fila vem de novo do Firestore
       unmount();
@@ -180,7 +180,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       render(<PedidosPendentes />);
       const [, segundo] = screen.getAllByRole('button', { name: 'Já avisei' });
       if (segundo) await userEvent.click(segundo);
-      expect(marcarAvisado).toHaveBeenCalledWith('p2');
+      expect(marcarAvisado).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p2' }));
     });
 
     it('recusa aparece como aviso, não como confirmação', () => {

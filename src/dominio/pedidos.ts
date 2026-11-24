@@ -40,6 +40,8 @@ export type AvisoPendente = Aviso & {
   nome: string;
   whatsapp: string;
   inicio: Date;
+  /** Atendimento criado ou movido pela resposta (não há na recusa). */
+  agendamentoId?: string;
 };
 
 /** RN02: passadas 24 h sem resposta, as travas soltam e o horário volta a ficar livre. */

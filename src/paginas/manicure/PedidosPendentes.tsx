@@ -288,12 +288,12 @@ function AvisosParaEnviar({ avisos }: { avisos: AvisoPendente[] }) {
               target="_blank"
               rel="noreferrer"
               className={ESTILO_BOTAO.principal}
-              onClick={() => marcarAvisado(a.pedidoId)}
+              onClick={() => marcarAvisado(a)}
             >
               <Icone nome="conversa" />
               {a.tipo === 'recusa' ? 'Enviar aviso no WhatsApp' : 'Enviar confirmação no WhatsApp'}
             </a>
-            <Botao variante="texto" onClick={() => marcarAvisado(a.pedidoId)}>
+            <Botao variante="texto" onClick={() => marcarAvisado(a)}>
               Já avisei
             </Botao>
           </li>

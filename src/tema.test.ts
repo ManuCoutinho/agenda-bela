@@ -41,6 +41,8 @@ const PARES: [string, string, number][] = [
   ['superficie', 'marca', TEXTO], // botão principal
   ['superficie', 'marca-escura', TEXTO], // botão principal pressionado
   ['marca-escura', 'marca-suave', TEXTO], // ícone da aba ativa
+  ['marca-escura', 'superficie', TEXTO], // próximo horário na lista de clientes
+  ['marca-escura', 'fundo', TEXTO], // idem, com o item pressionado
   ['superficie', 'texto', TEXTO], // snackbar
   ['texto', 'container', TEXTO], // aba ativa na barra de navegação
   ['texto-suave', 'container', TEXTO], // abas inativas

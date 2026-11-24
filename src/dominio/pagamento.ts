@@ -47,3 +47,16 @@ export const textoConfirmacaoComSinal = (p: {
   'Me mande o comprovante por aqui.' +
   (p.endereco ? ` Endereço: ${p.endereco}.` : '') +
   ' Até lá!';
+
+/** I10: pedido do sinal depois que o horário já está marcado (a cliente confirmou sozinha). */
+export const textoPedidoSinal = (p: {
+  nome: string;
+  servico: string;
+  quando: string;
+  sinalCentavos: number;
+  percentual: number;
+  chavePix: string;
+}) =>
+  `Oi, ${p.nome}! Para garantir seu horário de ${p.servico} (${p.quando}), ` +
+  `peço um sinal de ${formatarPreco(p.sinalCentavos)} (${p.percentual}% do valor) pelo Pix. ` +
+  `Chave: ${p.chavePix}. Me mande o comprovante por aqui. Obrigada!`;

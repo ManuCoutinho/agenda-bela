@@ -7,6 +7,9 @@ import { useClientes } from '../../hooks/useClientes';
 import Clientes from './Clientes';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
+vi.mock('../../hooks/useAgenda', () => ({
+  useAgendamentos: () => ({ dados: [], carregando: false, erro: false }),
+}));
 
 const cliente = (id: string, nome: string, whatsapp: string): Cliente => ({
   id,

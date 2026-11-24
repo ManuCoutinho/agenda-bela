@@ -9,7 +9,13 @@ import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { useBloqueios } from '../../hooks/useBloqueios';
-import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
+import {
+  cancelarAtendimento,
+  marcarAtendimento,
+  marcarConfirmacaoEnviada,
+  registrarResultado,
+  registrarSinalPedido,
+} from '../../servicos/agenda';
 import { salvarCliente } from '../../servicos/clientes';
 import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 import EditarAtendimento from './EditarAtendimento';
@@ -28,7 +34,17 @@ vi.mock('../../servicos/agenda', () => ({
   marcarAtendimento: vi.fn(),
   cancelarAtendimento: vi.fn(),
   registrarResultado: vi.fn(),
+  marcarConfirmacaoEnviada: vi.fn(),
+  registrarSinalPedido: vi.fn(),
 }));
+vi.mock('../../hooks/usePagamento', () => ({
+  usePagamento: () => ({
+    pagamento: { chavePix: 'ana@pix.com', sinalPercentual: 50 },
+    carregando: false,
+    erro: false,
+  }),
+}));
+vi.mock('../../hooks/useLinkCurto', () => ({ useLinkCurto: () => 'https://is.gd/agenda' }));
 
 const ANA = {
   id: 'c1',
@@ -163,6 +179,30 @@ describe('EditarAtendimento (RF07)', () => {
       /Escolha o horário\./,
     );
     expect(marcarAtendimento).not.toHaveBeenCalled();
+  });
+
+  it('I10: atendimento futuro manda confirmação e pede o sinal pelo WhatsApp', async () => {
+    vi.mocked(useAgendamento).mockReturnValue({
+      dados: { ...ATUAL, precoCentavos: 3500, pedidoId: 'p1' },
+      carregando: false,
+      erro: false,
+    });
+    renderizar('/atendimentos/a1');
+    const confirmacao = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
+    expect(decodeURIComponent(confirmacao.getAttribute('href') ?? '')).toContain(
+      'Salvar na sua agenda: https://is.gd/agenda',
+    );
+    confirmacao.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(confirmacao);
+    expect(marcarConfirmacaoEnviada).toHaveBeenCalledWith(
+      expect.objectContaining({ pedidoId: 'p1' }),
+    );
+
+    const sinal = screen.getByRole('link', { name: /Pedir sinal de R\$\s17,50 no WhatsApp/ });
+    expect(decodeURIComponent(sinal.getAttribute('href') ?? '')).toContain('Chave: ana@pix.com');
+    sinal.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(sinal);
+    expect(registrarSinalPedido).toHaveBeenCalledWith('a1', 1750);
   });
 
   it('ao editar, o horário atual não aparece como ocupado e as travas antigas vão junto', async () => {

@@ -151,6 +151,7 @@ const paraAviso = (pedidoId: string, d: DocumentData): AvisoPendente[] => {
       inicio: paraData(d.inicio) ?? new Date(0),
       tipo: tipo as TipoAviso,
       texto,
+      agendamentoId: typeof d.agendamentoId === 'string' ? d.agendamentoId : undefined,
     },
   ];
 };
@@ -172,9 +173,17 @@ export function observarAvisosPendentes(
   );
 }
 
-/** A manicure abriu (ou dispensou) a mensagem: o aviso sai da fila. Funciona offline. */
-export function marcarAvisado(pedidoId: string) {
-  gravarEmSegundoPlano(updateDoc(doc(pedidos, pedidoId), { avisadoEm: serverTimestamp() }));
+/**
+ * A manicure abriu (ou dispensou) a mensagem: o aviso sai da fila e, se era
+ * confirmação, o atendimento fica como "confirmação enviada" (I10). Funciona offline.
+ */
+export function marcarAvisado(aviso: Pick<AvisoPendente, 'pedidoId' | 'tipo' | 'agendamentoId'>) {
+  const lote = writeBatch(db);
+  lote.update(doc(pedidos, aviso.pedidoId), { avisadoEm: serverTimestamp() });
+  if (aviso.tipo !== 'recusa' && aviso.agendamentoId) {
+    lote.update(doc(agendamentos, aviso.agendamentoId), { confirmacaoEm: serverTimestamp() });
+  }
+  gravarEmSegundoPlano(lote.commit());
 }
 
 /**
@@ -226,11 +235,16 @@ export async function aprovarPedido(
     for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
       tx.delete(doc(travas, id));
     }
+    const atendimento =
+      substitui?.tipo === 'agendamento'
+        ? doc(agendamentos, substitui.agendamento.id)
+        : doc(agendamentos);
     tx.update(doc(pedidos, pedido.id), {
       status: 'aprovado',
       respondidoEm: serverTimestamp(),
       aviso,
       avisadoEm: null,
+      agendamentoId: atendimento.id,
     });
 
     const dadosDoServico = {
@@ -245,9 +259,10 @@ export async function aprovarPedido(
     };
     if (substitui?.tipo === 'agendamento') {
       // o atendimento muda de horário: o lembrete do dia antigo não vale mais
-      tx.update(doc(agendamentos, substitui.agendamento.id), {
+      tx.update(atendimento, {
         ...dadosDoServico,
         lembreteEm: deleteField(),
+        confirmacaoEm: deleteField(),
       });
       return;
     }
@@ -269,7 +284,7 @@ export async function aprovarPedido(
         atualizadoEm: serverTimestamp(),
       });
     }
-    tx.set(doc(agendamentos), {
+    tx.set(atendimento, {
       clienteId: cliente.id,
       clienteNome: pedido.nome,
       clienteWhatsapp: pedido.whatsapp,

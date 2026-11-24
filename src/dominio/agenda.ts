@@ -42,6 +42,12 @@ export type Agendamento = {
   sinalCentavos?: number;
   /** A manicure já tocou em "Enviar lembrete" (RF11). */
   lembreteEnviado?: boolean;
+  /** Pedido da página pública que originou o atendimento. */
+  pedidoId?: string;
+  /** I10: quando a confirmação foi enviada pelo WhatsApp. */
+  confirmacaoEnviadaEm?: Date;
+  /** I10: quando o sinal foi pedido pelo WhatsApp. */
+  sinalPedidoEm?: Date;
 };
 
 export type NovoAgendamento = Omit<Agendamento, 'id'>;
@@ -226,3 +232,6 @@ export function atendimentosDeAmanha(agendamentos: readonly Agendamento[], agora
 /** Instante → 'terça-feira, 1 de dezembro, às 09:00' (São Paulo). */
 export const rotuloInicio = (inicio: Date) =>
   `${rotuloDia(dataDoDia(inicio))}, às ${rotuloHora(horaDe(inicio))}`;
+
+/** Instante → '24/11, 14:32' (São Paulo), para "enviado em". */
+export const rotuloMomento = (d: Date) => format(noFuso(d), "dd/MM', 'HH:mm");

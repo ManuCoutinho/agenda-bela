@@ -2,6 +2,7 @@ import BarraSuperior from '../../componentes/BarraSuperior';
 import Carregando from '../../componentes/Carregando';
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import AvisarCliente from '../../componentes/AvisarCliente';
 import Botao from '../../componentes/Botao';
 import FormularioAtendimento from '../../componentes/FormularioAtendimento';
 import { ESTILO_LINK } from '../../componentes/estilos';
@@ -21,10 +22,19 @@ import { useBloqueios } from '../../hooks/useBloqueios';
 import { horasRecorrentesNoDia } from '../../dominio/bloqueios';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
+import { useLinkCurto } from '../../hooks/useLinkCurto';
+import { usePagamento } from '../../hooks/usePagamento';
 import { useServicos } from '../../hooks/useServicos';
+import { eventoDoHorario, linkGoogleAgenda } from '../../dominio/salvarNaAgenda';
 import { formatarWhatsApp } from '../../dominio/clientes';
 import { dddDe, escolherWhatsApp } from '../../dominio/importacao';
-import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
+import {
+  cancelarAtendimento,
+  marcarAtendimento,
+  marcarConfirmacaoEnviada,
+  registrarResultado,
+  registrarSinalPedido,
+} from '../../servicos/agenda';
 import { salvarCliente } from '../../servicos/clientes';
 import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 
@@ -47,6 +57,20 @@ export default function EditarAtendimento() {
   const { config } = configuracoes;
   const atendimento = useAgendamento(id);
   const atual = atendimento.dados;
+  const { pagamento } = usePagamento();
+  const linkAgenda = useLinkCurto(
+    atual
+      ? linkGoogleAgenda(
+          eventoDoHorario({
+            id: atual.id,
+            espaco: config.nome,
+            servico: atual.servicoNome,
+            inicio: atual.inicio,
+            duracaoMin: atual.duracaoMin,
+          }),
+        )
+      : '',
+  );
 
   const dataInicial = atual
     ? dataDoDia(atual.inicio)
@@ -246,6 +270,22 @@ export default function EditarAtendimento() {
               </Botao>
             </div>
           )}
+        </section>
+      )}
+
+      {atual && atual.status === 'marcado' && atual.inicio > new Date() && (
+        <section aria-labelledby="avisar" className="mt-10 border-t border-borda pt-6">
+          <h2 id="avisar" className="mb-3 text-secao font-medium">
+            Avisar a cliente
+          </h2>
+          <AvisarCliente
+            agendamento={atual}
+            endereco={config.endereco}
+            linkAgenda={linkAgenda}
+            pagamento={pagamento}
+            aoEnviarConfirmacao={() => marcarConfirmacaoEnviada(atual)}
+            aoPedirSinal={(centavos) => registrarSinalPedido(atual.id, centavos)}
+          />
         </section>
       )}
 

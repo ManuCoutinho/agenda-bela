@@ -83,10 +83,13 @@ export const textoConfirmacao = (p: {
   servico: string;
   quando: string;
   endereco: string;
+  /** I09: link para a cliente salvar o horário na agenda do celular. */
+  linkAgenda?: string;
 }) =>
   `Oi, ${p.nome}! Seu horário de ${p.servico} está confirmado para ${p.quando}.` +
   (p.endereco ? ` Endereço: ${p.endereco}.` : '') +
-  ' Até lá!';
+  ' Até lá!' +
+  (p.linkAgenda ? `\nSalvar na sua agenda: ${p.linkAgenda}` : '');
 
 /** Mensagem da manicure ao recusar, com o link para a cliente escolher outro horário. */
 export const textoRecusa = (p: { nome: string; quando: string; link: string }) =>

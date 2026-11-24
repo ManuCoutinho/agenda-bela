@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { rotuloInicio } from '../dominio/agenda';
 import { textoConfirmacao, type Pedido } from '../dominio/pedidos';
+import { eventoDoHorario, linkGoogleAgenda } from '../dominio/salvarNaAgenda';
+import { encurtarLink } from '../servicos/encurtador';
 import { aprovarPedido, observarPedidosConfirmados } from '../servicos/pedidos';
 import { useClientes } from './useClientes';
 import { useConfiguracoes } from './useConfiguracoes';
@@ -32,16 +34,28 @@ export function useConversaoPedidos() {
         nome: 'Serviço',
         duracaoMin: p.travas.length * 60,
       };
-      const texto = textoConfirmacao({
-        nome: p.nome,
-        servico: servico.nome,
-        quando: rotuloInicio(p.inicio),
-        endereco: configuracoes.config.endereco,
-      });
       const clienteId = clientes.clientes.find((c) => c.whatsapp === p.whatsapp)?.id;
-      aprovarPedido(p, servico, { aviso: { tipo: 'confirmacao', texto }, clienteId }).catch(
-        (erro: unknown) => console.error(erro),
+      const agenda = linkGoogleAgenda(
+        eventoDoHorario({
+          id: p.id,
+          espaco: configuracoes.config.nome,
+          servico: servico.nome,
+          inicio: p.inicio,
+          duracaoMin: servico.duracaoMin,
+        }),
       );
+      encurtarLink(agenda)
+        .then((curto) => {
+          const texto = textoConfirmacao({
+            nome: p.nome,
+            servico: servico.nome,
+            quando: rotuloInicio(p.inicio),
+            endereco: configuracoes.config.endereco,
+            linkAgenda: curto ?? agenda,
+          });
+          return aprovarPedido(p, servico, { aviso: { tipo: 'confirmacao', texto }, clienteId });
+        })
+        .catch((erro: unknown) => console.error(erro));
     }
   }, [pronto, confirmados, servicos.servicos, configuracoes.config, clientes.clientes]);
 }

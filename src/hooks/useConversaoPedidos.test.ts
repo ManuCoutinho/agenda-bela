@@ -13,6 +13,9 @@ vi.mock('../servicos/pedidos', () => ({
   aprovarPedido: vi.fn(),
   observarPedidosConfirmados: vi.fn(),
 }));
+vi.mock('../servicos/encurtador', () => ({
+  encurtarLink: vi.fn(async () => 'https://is.gd/agenda'),
+}));
 vi.mock('./useServicos', () => ({ useServicos: vi.fn() }));
 vi.mock('./useClientes', () => ({ useClientes: vi.fn() }));
 vi.mock('./useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
@@ -54,9 +57,10 @@ describe('conversão automática dos horários confirmados (I08)', () => {
     });
   });
 
-  it('vira atendimento da cliente cadastrada, com a confirmação na fila de avisos, uma vez só', () => {
+  it('vira atendimento da cliente cadastrada, com a confirmação na fila de avisos, uma vez só', async () => {
     const { rerender } = renderHook(() => useConversaoPedidos());
     rerender();
+    await vi.waitFor(() => expect(aprovarPedido).toHaveBeenCalled());
     expect(aprovarPedido).toHaveBeenCalledTimes(1);
     expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, expect.objectContaining({ nome: 'Mão' }), {
       clienteId: 'c1',
@@ -67,5 +71,8 @@ describe('conversão automática dos horários confirmados (I08)', () => {
         ),
       },
     });
+    expect(vi.mocked(aprovarPedido).mock.calls[0]?.[2].aviso.texto).toContain(
+      'Salvar na sua agenda: https://is.gd/agenda',
+    );
   });
 });

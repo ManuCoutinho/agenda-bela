@@ -162,6 +162,15 @@ describe('Página pública (RF08, RF09)', () => {
       travas: ['2026-12-01_0900', '2026-12-01_1000'], // 1 h + 30 min de intervalo = 2 h
     });
     expect(await screen.findByRole('heading', { name: 'Horário marcado!' })).toBeInTheDocument();
+    expect(screen.getByText('R$ 35,00')).toBeInTheDocument();
+    const google = new URL(
+      screen.getByRole('link', { name: 'Google Agenda' }).getAttribute('href') ?? '',
+    );
+    expect(google.searchParams.get('dates')).toBe('20261201T120000Z/20261201T130000Z');
+    expect(screen.getByRole('link', { name: 'iPhone e outras agendas' })).toHaveAttribute(
+      'download',
+      'horario-marcado.ics',
+    );
     const link = screen.getByRole('link', { name: 'Avisar no WhatsApp' });
     expect(link.getAttribute('href')).toMatch(
       /^https:\/\/wa\.me\/5541900000000\?text=Oi!%20Sou%20Ana%20e%20acabei%20de%20marcar/,

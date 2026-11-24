@@ -23,6 +23,13 @@ import {
   type RegrasHorario,
 } from '../../dominio/horariosLivres';
 import { HorarioJaPedido, textoAvisoPedido, type DadosPedido } from '../../dominio/pedidos';
+import {
+  arquivoIcs,
+  linkArquivoIcs,
+  linkGoogleAgenda,
+  tituloEvento,
+  type EventoAgenda,
+} from '../../dominio/salvarNaAgenda';
 import { formatarDuracao, formatarPreco, type Servico } from '../../dominio/servicos';
 import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
@@ -59,7 +66,7 @@ export default function Agendar() {
   return <Passos pagina={pagina} />;
 }
 
-type Enviado = { nome: string; servico: string; dia: string; hora: string };
+type Enviado = { nome: string; servico: Servico; dia: string; hora: string };
 
 function Passos({ pagina }: { pagina: PaginaPublica }) {
   const { config } = pagina;
@@ -141,7 +148,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
         inicio,
         travas: idsTravas(inicio, servico.duracaoMin, config.intervaloMin),
       });
-      setEnviado({ nome: dados.nome, servico: servico.nome, dia, hora });
+      setEnviado({ nome: dados.nome, servico, dia, hora });
     } catch (e) {
       if (e instanceof HorarioJaPedido) {
         setBusca({ servico: servico.id, dia });
@@ -478,27 +485,73 @@ function Confirmacao({
   whatsapp: string;
   aoPedirOutro: () => void;
 }) {
+  const { servico } = enviado;
   const texto = textoAvisoPedido({
     nome: enviado.nome,
-    servico: enviado.servico,
+    servico: servico.nome,
     quando: quando(enviado.dia, enviado.hora),
   });
+  const inicio = inicioEm(enviado.dia, enviado.hora);
+  const evento: EventoAgenda = {
+    id: `${enviado.dia}_${enviado.hora}_${enviado.servico.id}`,
+    titulo: tituloEvento(espaco),
+    inicio,
+    fim: new Date(inicio.getTime() + servico.duracaoMin * 60_000),
+    detalhes: `${servico.nome} (${formatarDuracao(servico.duracaoMin)})`,
+  };
   return (
-    <section aria-labelledby="enviado" className="flex flex-col gap-6 pt-4 text-center">
-      <span className="mx-auto inline-flex size-24 items-center justify-center rounded-full bg-marca-suave text-marca">
-        <Icone nome="confirmado" className="size-12" />
-      </span>
-      <div className="flex flex-col gap-2">
+    <section aria-labelledby="enviado" className="flex flex-col gap-6 pt-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="inline-flex size-24 items-center justify-center rounded-full bg-marca-suave text-marca">
+          <Icone nome="confirmado" className="size-12" />
+        </span>
         <h2 id="enviado" className="text-titulo font-normal">
           Horário marcado!
         </h2>
-        <p className="first-letter:uppercase">
-          {enviado.servico}: {quando(enviado.dia, enviado.hora)}.
-        </p>
-        <p className="text-texto-suave">
-          {espaco || 'O espaço'} manda a confirmação pelo WhatsApp.
-        </p>
       </div>
+      <dl className="flex flex-col gap-2 rounded-xl border border-borda bg-superficie p-4">
+        <div>
+          <dt className="text-texto-suave">Serviço</dt>
+          <dd className="font-medium">
+            {servico.nome} ({formatarDuracao(servico.duracaoMin)})
+          </dd>
+        </div>
+        <div>
+          <dt className="text-texto-suave">Quando</dt>
+          <dd className="font-medium first-letter:uppercase">
+            {quando(enviado.dia, enviado.hora)}
+          </dd>
+        </div>
+        {servico.precoCentavos > 0 && (
+          <div>
+            <dt className="text-texto-suave">Valor</dt>
+            <dd className="font-medium">{formatarPreco(servico.precoCentavos)}</dd>
+          </div>
+        )}
+      </dl>
+      <p>{espaco || 'O espaço'} manda a confirmação pelo WhatsApp e, na véspera, um lembrete.</p>
+      <section aria-labelledby="salvar" className="flex flex-col gap-3">
+        <h3 id="salvar" className="text-secao font-medium">
+          Salvar na minha agenda
+        </h3>
+        <a
+          href={linkGoogleAgenda(evento)}
+          target="_blank"
+          rel="noreferrer"
+          className={ESTILO_BOTAO.secundario}
+        >
+          <Icone nome="hoje" />
+          Google Agenda
+        </a>
+        <a
+          href={linkArquivoIcs(arquivoIcs([evento], new Date()))}
+          download="horario-marcado.ics"
+          className={ESTILO_BOTAO.secundario}
+        >
+          <Icone nome="hoje" />
+          iPhone e outras agendas
+        </a>
+      </section>
       <div className="flex flex-col gap-3">
         {whatsapp && (
           <a
@@ -511,7 +564,7 @@ function Confirmacao({
             Avisar no WhatsApp
           </a>
         )}
-        <Botao variante="secundario" onClick={aoPedirOutro}>
+        <Botao variante="texto" onClick={aoPedirOutro}>
           Marcar outro horário
         </Botao>
       </div>

@@ -164,6 +164,11 @@ describe('pedidos (HU03)', () => {
     await assertSucceeds(reservar(['2026-12-01_0900', '2026-12-01_0930']));
   });
 
+  it('I02: aceita o maior pedido da página (5 h + 1 h de intervalo = 6 travas de 1 h)', async () => {
+    const ids = ['09', '10', '11', '12', '13', '14'].map((h) => `2026-12-01_${h}00`);
+    await assertSucceeds(reservar(ids));
+  });
+
   it('segunda cliente no mesmo horário é recusada e nada é gravado', async () => {
     await reservar(['2026-12-01_0900', '2026-12-01_0930']);
     await assertFails(reservar(['2026-12-01_0930', '2026-12-01_1000']));

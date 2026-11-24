@@ -10,7 +10,7 @@ const regras: RegrasHorario = {
   expediente: [{ dia: 2, ini: '09:00', fim: '11:00' }],
   intervaloMin: 0,
   antecedenciaMin: 0,
-  janelaDias: 30,
+  mesesAbertos: [202611, 202612],
   recorrentes: [],
 };
 

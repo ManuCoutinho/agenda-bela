@@ -20,6 +20,11 @@ const OPCOES = [
     rotulo: 'Painel do mês',
     descricao: 'Realizados, faltas e quanto entrou',
   },
+  {
+    para: '/mais/agenda-aberta',
+    rotulo: 'Agenda aberta',
+    descricao: 'Meses em que as clientes podem pedir horário',
+  },
   { para: '/mais/servicos', rotulo: 'Serviços', descricao: 'Nome, duração e preço' },
   {
     para: '/mais/bloqueios',

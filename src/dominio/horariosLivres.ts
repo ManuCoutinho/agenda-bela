@@ -1,4 +1,5 @@
-import { dataDoDia, diaDaSemana, inicioEm, somarDias } from './agenda';
+import { dataDoDia, diaDaSemana, inicioEm } from './agenda';
+import { diasDosMesesAbertos, mesDoDia, mesesValidos, type Mes } from './agendaAberta';
 import { expedienteDoDia, type Configuracoes } from './configuracoes';
 import {
   arredondarHora,
@@ -13,18 +14,12 @@ import {
 /** O que a página pública precisa saber para oferecer horários (vem de `config/publico`). */
 export type RegrasHorario = Pick<
   Configuracoes,
-  'expediente' | 'intervaloMin' | 'antecedenciaMin' | 'janelaDias'
-> & { recorrentes: readonly Recorrente[] };
+  'expediente' | 'intervaloMin' | 'antecedenciaMin'
+> & { recorrentes: readonly Recorrente[]; mesesAbertos: readonly Mes[] };
 
-/** Dias (AAAA-MM-DD) que a cliente pode pedir: de hoje até hoje + janela (RN03). */
-export function diasDaJanela(agora: Date, janelaDias: number): string[] {
-  const hoje = dataDoDia(agora);
-  return Array.from({ length: janelaDias + 1 }, (_, i) => somarDias(hoje, i));
-}
-
-/** Dias da janela em que a manicure atende (tem expediente nesse dia da semana). */
+/** Dias dos meses abertos (RN03, I06) em que a manicure atende (tem expediente). */
 export const diasAbertos = (regras: RegrasHorario, agora: Date) =>
-  diasDaJanela(agora, regras.janelaDias).filter(
+  diasDosMesesAbertos(agora, regras.mesesAbertos).filter(
     (data) => expedienteDoDia(regras.expediente, diaDaSemana(data)).length > 0,
   );
 
@@ -33,7 +28,7 @@ export const diasAbertos = (regras: RegrasHorario, agora: Date) =>
  * (AAAA-MM-DD, fuso de São Paulo), de hora em hora.
  * - RN01: dentro do expediente; o serviço termina até o fim da faixa.
  * - RN02: trava ativa (atendimento, bloqueio ou pedido pendente) ocupa o horário.
- * - RN03: só a partir de agora + antecedência e até hoje + janela de dias.
+ * - RN03: só a partir de agora + antecedência e só nos meses abertos (I06).
  * - RN04: o intervalo depois do serviço também precisa estar livre.
  * Bloqueios fixos da semana (`recorrentes`) contam como ocupados.
  */
@@ -46,8 +41,8 @@ export function horariosLivres(p: {
   agora: Date;
 }): string[] {
   const { regras } = p;
-  const janela = diasDaJanela(p.agora, regras.janelaDias);
-  if (!janela.includes(p.data)) return [];
+  const abertos = mesesValidos(regras.mesesAbertos, p.agora);
+  if (p.data < dataDoDia(p.agora) || !abertos.includes(mesDoDia(p.data))) return [];
 
   const dia = diaDaSemana(p.data);
   const fixos = regras.recorrentes

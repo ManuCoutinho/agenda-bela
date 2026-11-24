@@ -92,8 +92,8 @@ describe('esquemaConfiguracoes (RF04)', () => {
   });
 
   it('recusa valor fora das listas', () => {
-    expect(mensagens(campos({ janelaDias: '45' }))).toEqual([
-      'janelaDias: Escolha uma opção da lista.',
+    expect(mensagens(campos({ antecedenciaMin: '45' }))).toEqual([
+      'antecedenciaMin: Escolha uma opção da lista.',
     ]);
   });
 });

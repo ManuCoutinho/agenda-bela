@@ -234,6 +234,26 @@ describe('pedidos (HU03)', () => {
     await assertSucceeds(reservar(['2026-12-01_0900']));
   });
 
+  it('I06: só aceita pedido nos meses abertos, no horário de Brasília', async () => {
+    const base = new Date(Date.now() + 30 * 24 * HORA);
+    const ano = base.getUTCFullYear();
+    const mes = base.getUTCMonth();
+    // 01:00 UTC do dia 1 = 22:00 do último dia do mês anterior em São Paulo
+    const virada = Timestamp.fromDate(new Date(Date.UTC(ano, mes + 1, 1, 1)));
+    const mesEmSP = ano * 100 + mes + 1;
+    const seguinte = mes === 11 ? (ano + 1) * 100 + 1 : mesEmSP + 1;
+    const abrir = (mesesAbertos: number[]) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        ctx.firestore().doc('config/publico').set({ mesesAbertos }),
+      );
+    const ids = ['2026-12-01_0900'];
+
+    await abrir([seguinte]);
+    await assertFails(reservar(ids, pedido(ids, { inicio: virada })));
+    await abrir([mesEmSP]);
+    await assertSucceeds(reservar(ids, pedido(ids, { inicio: virada })));
+  });
+
   it('visitante não lê pedidos; manicure lê', async () => {
     await reservar(['2026-12-01_0900']);
     await assertFails(visitante().collection('pedidos').get());

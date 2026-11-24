@@ -60,7 +60,11 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   const [erroEnvio, setErroEnvio] = useState<string>();
   const [enviado, setEnviado] = useState<Enviado>();
 
-  const regras: RegrasHorario = { ...config, recorrentes: pagina.recorrentes };
+  const regras: RegrasHorario = {
+    ...config,
+    recorrentes: pagina.recorrentes,
+    mesesAbertos: pagina.mesesAbertos,
+  };
   const servicos = pagina.servicos.filter((s) => s.publico);
   const servico = servicos.find((s) => s.id === busca.get('servico'));
   const dias = diasAbertos(regras, new Date());

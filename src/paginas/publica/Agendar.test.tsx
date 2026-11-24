@@ -28,7 +28,6 @@ const PAGINA: PaginaPublica = {
     expediente: [{ dia: 2, ini: '09:00', fim: '11:00' }], // só terça
     intervaloMin: 30,
     antecedenciaMin: 0,
-    janelaDias: 14,
   },
   servicos: [
     { id: 's1', nome: 'Mão', duracaoMin: 60, precoCentavos: 3500, publico: true },
@@ -36,6 +35,7 @@ const PAGINA: PaginaPublica = {
   ],
   recorrentes: [],
   pausa: { ativa: false, aviso: '' },
+  mesesAbertos: [202611, 202612],
 };
 
 function renderizar(rota = '/agendar/espaco-juju') {
@@ -107,7 +107,7 @@ describe('Página pública (RF08, RF09)', () => {
     renderizar();
     await userEvent.click(screen.getByRole('button', { name: /Mão/ }));
     const dias = screen.getAllByRole('button', { name: /feira|sábado|domingo/ });
-    expect(dias.map((d) => d.textContent)).toEqual([
+    expect(dias.map((d) => d.textContent).slice(0, 2)).toEqual([
       'ter24 novterça-feira, 24 de novembro',
       'ter1 dezterça-feira, 1 de dezembro',
     ]);

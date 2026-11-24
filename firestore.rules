@@ -40,8 +40,19 @@ service cloud.firestore {
         return !exists(publico) || get(publico).data.get('pausa', {}).get('ativa', false) != true;
       }
 
+      // I06: só nos meses abertos pela manicure (AAAAMM no horário de Brasília, UTC-3 fixo
+      // desde 2019). Sem o campo, vale só o limite de 92 dias abaixo.
+      function mesAberto(inicio) {
+        let publico = /databases/$(database)/documents/config/publico;
+        let local = inicio - duration.value(3, 'h');
+        return !exists(publico)
+          || !('mesesAbertos' in get(publico).data)
+          || (local.year() * 100 + local.month()) in get(publico).data.mesesAbertos;
+      }
+
       allow read, update, delete: if isOwner();
       allow create: if paginaAberta()
+        && mesAberto(request.resource.data.inicio)
         && request.resource.data.keys().hasOnly(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
         && request.resource.data.keys().hasAll(

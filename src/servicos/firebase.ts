@@ -26,8 +26,11 @@ export const db = initializeFirestore(app, {
 
 // `VITE_USAR_EMULADOR=true` no .env.local aponta o app para o Emulator Suite
 if (import.meta.env.VITE_USAR_EMULADOR === 'true') {
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, 'localhost', 8080);
+  // portas trocáveis para rodar ao lado de outro emulador (padrão do firebase.json)
+  const portaAuth = import.meta.env.VITE_EMULADOR_PORTA_AUTH ?? '9099';
+  const portaFirestore = Number(import.meta.env.VITE_EMULADOR_PORTA_FIRESTORE ?? 8080);
+  connectAuthEmulator(auth, `http://localhost:${portaAuth}`, { disableWarnings: true });
+  connectFirestoreEmulator(db, 'localhost', portaFirestore);
 }
 
 /**

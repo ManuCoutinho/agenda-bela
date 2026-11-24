@@ -81,6 +81,21 @@ describe('Página pública (RF08, RF09)', () => {
     expect(screen.getByRole('heading', { name: 'Página não encontrada' })).toBeInTheDocument();
   });
 
+  it('mostra o Instagram do espaço quando configurado', () => {
+    renderizar();
+    expect(screen.queryByRole('link', { name: /Instagram/ })).not.toBeInTheDocument();
+    vi.mocked(usePaginaPublica).mockReturnValue({
+      pagina: { ...PAGINA, config: { ...PAGINA.config, instagram: 'espacojuju' } },
+      carregando: false,
+      erro: false,
+    });
+    renderizar();
+    expect(screen.getByRole('link', { name: 'Ver o Instagram de Espaço Juju' })).toHaveAttribute(
+      'href',
+      'https://www.instagram.com/espacojuju/',
+    );
+  });
+
   it('mostra só os serviços públicos, com duração e preço', () => {
     renderizar();
     expect(screen.getByRole('heading', { name: 'Espaço Juju' })).toBeInTheDocument();

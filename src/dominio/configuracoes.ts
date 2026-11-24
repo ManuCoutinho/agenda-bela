@@ -25,6 +25,8 @@ export type Configuracoes = {
   /** WhatsApp da manicure (55 + DDD + número) ou '' se ainda não informado. */
   whatsapp: string;
   endereco: string;
+  /** Usuário do Instagram, sem @ ('' se não tiver). */
+  instagram: string;
   expediente: FaixaExpediente[];
   /** Folga depois de cada atendimento (RN04). */
   intervaloMin: number;
@@ -53,6 +55,7 @@ export const CONFIGURACOES_PADRAO: Configuracoes = {
   slug: '',
   whatsapp: '',
   endereco: '',
+  instagram: '',
   expediente: [1, 2, 3, 4, 5, 6].map((dia) => ({ dia, ...DIA_PADRAO })),
   intervaloMin: 0,
   antecedenciaMin: 120,
@@ -106,6 +109,17 @@ export const esquemaConfiguracoes = z.object({
     return numero;
   }),
   endereco: z.string().trim().max(200, 'Use até 200 letras no endereço.'),
+  instagram: z.string().transform((texto, ctx) => {
+    const usuario = usuarioInstagram(texto);
+    if (usuario === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Escreva o seu @ do Instagram, por exemplo @espacojuju.',
+      });
+      return z.NEVER;
+    }
+    return usuario;
+  }),
   dias: z
     .array(esquemaDia)
     .length(7)
@@ -137,6 +151,7 @@ export const paraConfiguracoes = (d: DadosConfiguracoes, slugAtual = ''): Config
   slug: slugAtual || gerarSlug(d.nome) || 'agenda',
   whatsapp: d.whatsapp,
   endereco: d.endereco,
+  instagram: d.instagram,
   expediente: d.dias.flatMap((dia, i) =>
     dia.aberto ? [{ dia: i, ini: dia.ini, fim: dia.fim }] : [],
   ),
@@ -150,6 +165,7 @@ export const paraCampos = (c: Configuracoes): CamposConfiguracoes => ({
   nome: c.nome,
   whatsapp: c.whatsapp && formatarWhatsApp(c.whatsapp),
   endereco: c.endereco,
+  instagram: c.instagram && `@${c.instagram}`,
   dias: DIAS_SEMANA.map((_, i) => {
     const faixa = c.expediente.find((f) => f.dia === i);
     return faixa
@@ -160,3 +176,19 @@ export const paraCampos = (c: Configuracoes): CamposConfiguracoes => ({
   antecedenciaMin: String(c.antecedenciaMin),
   janelaDias: String(c.janelaDias),
 });
+
+const USUARIO_INSTAGRAM = /^[a-z0-9._]{1,30}$/;
+
+/**
+ * "@espacojuju", "espacojuju" ou o link do perfil → "espacojuju"; vazio → "".
+ * `null` se não parece um usuário do Instagram.
+ */
+export function usuarioInstagram(texto: string): string | null {
+  const limpo = texto.trim().toLowerCase();
+  if (!limpo) return '';
+  const doLink = /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^/?#]+)/.exec(limpo);
+  const usuario = (doLink?.[1] ?? limpo).replace(/^@/, '');
+  return USUARIO_INSTAGRAM.test(usuario) ? usuario : null;
+}
+
+export const linkInstagram = (usuario: string) => `https://www.instagram.com/${usuario}/`;

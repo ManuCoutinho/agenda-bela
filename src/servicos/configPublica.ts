@@ -28,6 +28,7 @@ const paraConfiguracoes = (d: DocumentData | undefined): Configuracoes => {
     slug: texto(d?.slug, p.slug),
     whatsapp: texto(d?.whatsapp, p.whatsapp),
     endereco: texto(d?.endereco, p.endereco),
+    instagram: texto(d?.instagram, p.instagram),
     expediente: Array.isArray(d?.expediente)
       ? d.expediente.map((f: DocumentData) => ({
           dia: Number(f.dia),

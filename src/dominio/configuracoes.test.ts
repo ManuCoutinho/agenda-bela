@@ -7,6 +7,7 @@ import {
   gerarSlug,
   paraCampos,
   paraConfiguracoes,
+  usuarioInstagram,
   type CamposConfiguracoes,
 } from './configuracoes';
 
@@ -96,5 +97,32 @@ describe('expedienteDoDia', () => {
       { ini: '09:00', fim: '18:00' },
     ]);
     expect(expedienteDoDia(CONFIGURACOES_PADRAO.expediente, 0)).toEqual([]);
+  });
+});
+
+describe('usuarioInstagram', () => {
+  it.each([
+    ['@EspacoJuju', 'espacojuju'],
+    ['espaco.juju_', 'espaco.juju_'],
+    ['https://www.instagram.com/espacojuju/?hl=pt', 'espacojuju'],
+    ['instagram.com/espacojuju', 'espacojuju'],
+    ['  ', ''],
+  ])('%s → %s', (texto, usuario) => {
+    expect(usuarioInstagram(texto)).toBe(usuario);
+  });
+
+  it('recusa o que não é usuário', () => {
+    expect(usuarioInstagram('espaço juju')).toBeNull();
+    expect(mensagens(campos({ instagram: 'espaço juju' }))).toEqual([
+      'instagram: Escreva o seu @ do Instagram, por exemplo @espacojuju.',
+    ]);
+  });
+
+  it('o formulário mostra com @ e grava sem', () => {
+    const config = { ...CONFIGURACOES_PADRAO, instagram: 'espacojuju' };
+    expect(paraCampos(config).instagram).toBe('@espacojuju');
+    expect(
+      paraConfiguracoes(esquemaConfiguracoes.parse(campos({ instagram: '@espacojuju' }))).instagram,
+    ).toBe('espacojuju');
   });
 });

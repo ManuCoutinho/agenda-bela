@@ -7,11 +7,13 @@ import Icone from '../../componentes/Icone';
 import Carregando from '../../componentes/Carregando';
 import {
   ESTILO_BOTAO,
+  ESTILO_BOTAO_ICONE,
   ESTILO_FOLHA,
   ESTILO_ITEM_LISTA,
   ESTILO_LISTA,
 } from '../../componentes/estilos';
 import { idsTravas, inicioEm, rotuloDia, rotuloDiaCurto, rotuloHora } from '../../dominio/agenda';
+import { linkInstagram } from '../../dominio/configuracoes';
 import { diasAbertos, type RegrasHorario } from '../../dominio/horariosLivres';
 import { HorarioJaPedido, textoAvisoPedido, type DadosPedido } from '../../dominio/pedidos';
 import { formatarDuracao, formatarPreco, type Servico } from '../../dominio/servicos';
@@ -68,6 +70,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   const { horarios, carregando, erro } = useHorariosLivres(dia ?? '', servico?.duracaoMin, regras);
 
   const titulo = config.nome || 'Agendar horário';
+  const base = { titulo, instagram: config.instagram };
   const ir = (params: Record<string, string>) => {
     setAviso(undefined);
     setErroEnvio(undefined);
@@ -103,7 +106,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   if (pagina.pausa.ativa && !enviado) {
     return (
-      <Moldura titulo={titulo} endereco={config.endereco}>
+      <Moldura {...base} endereco={config.endereco}>
         <section aria-labelledby="pausada" className="flex flex-col gap-4">
           <h2 id="pausada" className="text-secao font-medium">
             Agendamentos pausados no momento
@@ -127,7 +130,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   if (enviado) {
     return (
-      <Moldura titulo={titulo}>
+      <Moldura {...base}>
         <Confirmacao
           enviado={enviado}
           espaco={config.nome}
@@ -143,7 +146,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   if (!servico) {
     return (
-      <Moldura titulo={titulo} endereco={config.endereco}>
+      <Moldura {...base} endereco={config.endereco}>
         <Passo numero={1} titulo="Escolha o serviço" />
         {servicos.length === 0 ? (
           <p className="text-texto-suave">
@@ -174,7 +177,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   if (!dia) {
     return (
-      <Moldura titulo={titulo} voltarPara={voltarServico}>
+      <Moldura {...base} voltarPara={voltarServico}>
         <Passo numero={2} titulo="Escolha o dia" />
         <Escolhas servico={servico} />
         {dias.length === 0 ? (
@@ -209,7 +212,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   if (!hora) {
     return (
-      <Moldura titulo={titulo} voltarPara={voltarDia}>
+      <Moldura {...base} voltarPara={voltarDia}>
         <Passo numero={3} titulo="Escolha o horário" />
         <Escolhas servico={servico} dia={dia} />
         {aviso && (
@@ -257,7 +260,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   const aindaLivre = carregando || horarios.includes(hora);
   return (
-    <Moldura titulo={titulo} voltarPara={`${voltarDia}&dia=${dia}`}>
+    <Moldura {...base} voltarPara={`${voltarDia}&dia=${dia}`}>
       <Passo numero={4} titulo="Seus dados" />
       <Escolhas servico={servico} dia={dia} hora={hora} />
       {aindaLivre ? (
@@ -286,18 +289,36 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
 function Moldura({
   titulo,
+  instagram,
   voltarPara,
   endereco,
   children,
 }: {
   titulo: string;
+  instagram: string;
   voltarPara?: string;
   endereco?: string;
   children: ReactNode;
 }) {
   return (
     <main className={`${ESTILO_FOLHA} pb-[calc(2rem+env(safe-area-inset-bottom))]`}>
-      <BarraSuperior titulo={titulo} voltarPara={voltarPara} />
+      <BarraSuperior
+        titulo={titulo}
+        voltarPara={voltarPara}
+        acao={
+          instagram && (
+            <a
+              href={linkInstagram(instagram)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Ver o Instagram de ${titulo}`}
+              className={ESTILO_BOTAO_ICONE}
+            >
+              <Icone nome="instagram" />
+            </a>
+          )
+        }
+      />
       {endereco && <p className="mb-4 text-texto-suave">{endereco}</p>}
       {children}
     </main>

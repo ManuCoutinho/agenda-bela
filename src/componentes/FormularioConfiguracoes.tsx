@@ -70,6 +70,23 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
         >
           {(a) => <textarea {...a} {...register('endereco')} rows={2} className={ESTILO_CAMPO} />}
         </Campo>
+        <Campo
+          id="instagram"
+          rotulo="Instagram (opcional)"
+          dica="Ex.: @espacojuju. Aparece na página de agendamento para a cliente ver seus trabalhos."
+          erro={errors.instagram?.message}
+        >
+          {(a) => (
+            <input
+              {...a}
+              {...register('instagram')}
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className={ESTILO_CAMPO}
+            />
+          )}
+        </Campo>
       </fieldset>
 
       <fieldset className={ESTILO_GRUPO}>

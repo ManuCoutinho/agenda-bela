@@ -30,6 +30,9 @@ export type Pedido = {
   semAviso?: boolean;
   /** I13: chave do aparelho em que a cliente marcou. */
   chave?: string;
+  /** I14: a cliente remarcou: id do atendimento antigo e quando ele era. */
+  substitui?: string;
+  substituiInicio?: Date;
 };
 
 export type TipoAviso = 'confirmacao' | 'troca' | 'recusa';
@@ -160,3 +163,29 @@ export const textoTroca = (p: {
   `Oi, ${p.nome}! Troquei o seu horário: o de ${p.antes} passou para ${p.quando} (${p.servico}).` +
   (p.endereco ? ` Endereço: ${p.endereco}.` : '') +
   ' Até lá!';
+
+/** I14: pedido de cancelamento feito pela cliente em "Meus horários". */
+export type Solicitacao = {
+  id: string;
+  /** Id do atendimento. */
+  horario: string;
+  motivo: string;
+  criadoEm: Date;
+  status: 'pendente' | 'aprovada' | 'recusada';
+  /** Mensagem a mandar depois da resposta (some quando enviada). */
+  aviso?: string;
+  avisada: boolean;
+};
+
+export const textoCancelamentoAprovado = (p: { nome: string; quando: string; link: string }) =>
+  `Oi, ${p.nome}! Cancelei o seu horário de ${p.quando}. ` +
+  `Quando quiser, marque outro por aqui: ${p.link}`;
+
+export const textoCancelamentoRecusado = (p: { nome: string; quando: string }) =>
+  `Oi, ${p.nome}! Vi seu pedido para cancelar o horário de ${p.quando}. ` +
+  'Me chama aqui para a gente conversar?';
+
+/** I14: a cliente avisa a manicure que remarcou pela página. */
+export const textoAvisoTroca = (p: { nome: string; antes: string; quando: string }) =>
+  `Oi! Sou ${p.nome} e troquei meu horário de ${p.antes} para ${p.quando} ` +
+  'pela sua página de agendamento. Até lá!';

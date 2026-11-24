@@ -50,6 +50,7 @@ describe('"Meus horários" (I13)', () => {
       id,
       inicio: inicioEm(dia, '1000'),
       servico: 'Mão',
+      servicoId: 's1',
       duracaoMin: 60,
       travas: [],
     });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { rotuloInicio } from '../dominio/agenda';
-import { textoConfirmacao, type Pedido } from '../dominio/pedidos';
+import { textoConfirmacao, textoTroca, type Pedido } from '../dominio/pedidos';
 import { eventoDoHorario, linkGoogleAgenda } from '../dominio/salvarNaAgenda';
 import { encurtarLink } from '../servicos/encurtador';
 import { aprovarPedido, observarPedidosConfirmados } from '../servicos/pedidos';
@@ -46,15 +46,20 @@ export function useConversaoPedidos() {
       );
       encurtarLink(agenda)
         .then((curto) => {
-          const texto = textoConfirmacao({
+          const mensagem = {
             nome: p.nome,
             servico: servico.nome,
             quando: rotuloInicio(p.inicio),
             endereco: configuracoes.config.endereco,
-            linkAgenda: curto ?? agenda,
-          });
+          };
+          // I14: remarcação feita pela cliente vira aviso de troca
+          const texto = p.substituiInicio
+            ? textoTroca({ ...mensagem, antes: rotuloInicio(p.substituiInicio) })
+            : textoConfirmacao({ ...mensagem, linkAgenda: curto ?? agenda });
           return aprovarPedido(p, servico, {
-            aviso: p.semAviso ? undefined : { tipo: 'confirmacao', texto },
+            aviso: p.semAviso
+              ? undefined
+              : { tipo: p.substituiInicio ? 'troca' : 'confirmacao', texto },
             clienteId,
           });
         })

@@ -16,6 +16,14 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uidDaManicure() || request.auth.uid == uidService();
     }
 
+    // I14: o horário está em "Meus horários" da chave e faltam 24 h ou mais para ele
+    function horarioDaChave(chave, horario) {
+      let portal = /databases/$(database)/documents/portal/$(chave);
+      return exists(portal)
+        && horario in get(portal).data.horarios
+        && get(portal).data.horarios[horario].inicio > request.time + duration.value(24, 'h');
+    }
+
     match /config/{doc} {
       allow read: if doc == 'publico' || isOwner();
       allow write: if isOwner();
@@ -62,13 +70,22 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/series/$(d.serieId)).data.whatsapp == d.whatsapp);
       }
 
+      // I14: remarcar um horário dela (de "Meus horários"), com 24 h ou mais pela frente
+      function remarcacao(d) {
+        return !('substitui' in d) || (d.substitui is string
+          && d.chave is string
+          && d.substituiInicio is timestamp
+          && horarioDaChave(d.chave, d.substitui));
+      }
+
       allow read, update, delete: if isOwner();
       allow create: if paginaAberta()
         && mesAberto(request.resource.data.inicio)
         && request.resource.data.keys().hasOnly(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas',
-           'serieId', 'chave'])
+           'serieId', 'chave', 'substitui', 'substituiInicio'])
         && daSerie(request.resource.data)
+        && remarcacao(request.resource.data)
         // I13: chave pessoal do aparelho da cliente (para "Meus horários")
         && (!('chave' in request.resource.data)
           || (request.resource.data.chave is string
@@ -112,6 +129,21 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow write: if isOwner();
+    }
+
+    // I14: pedido de cancelamento da cliente; a dona aprova ou recusa
+    match /solicitacoes/{id} {
+      allow read, update, delete: if isOwner();
+      allow create: if request.resource.data.keys().hasOnly(
+          ['tipo', 'chave', 'horario', 'motivo', 'criadoEm'])
+        && request.resource.data.keys().hasAll(['tipo', 'chave', 'horario', 'criadoEm'])
+        && request.resource.data.tipo == 'cancelamento'
+        && request.resource.data.chave is string
+        && request.resource.data.horario is string
+        && (!('motivo' in request.resource.data)
+          || (request.resource.data.motivo is string && request.resource.data.motivo.size() <= 200))
+        && request.resource.data.criadoEm == request.time
+        && horarioDaChave(request.resource.data.chave, request.resource.data.horario);
     }
 
     // I11: horário fixo pedido pela cliente; a dona lê, encerra e apaga
@@ -160,13 +192,32 @@ service cloud.firestore {
               && d.expiraEm <= request.time + duration.value(24, 'h'))
             || (d.expiraEm == null && d.pedidoId is string && pedidoNovoConfirmado(d.pedidoId)));
       }
+      // I14: na remarcação, a cliente solta as travas do horário antigo dela, no mesmo lote
+      // do pedido novo que o substitui (sem pedido novo seria cancelar sem aprovação)
+      function liberacaoValida() {
+        let d = request.resource.data;
+        let portal = /databases/$(database)/documents/portal/$(d.liberadaPor);
+        let novo = /databases/$(database)/documents/pedidos/$(d.pedidoNovo);
+        return resource.data.expiraEm == null
+          && d.keys().hasOnly(['data', 'hora', 'expiraEm', 'liberadaPor', 'horario', 'pedidoNovo'])
+          && d.data == resource.data.data
+          && d.hora == resource.data.hora
+          && d.expiraEm is timestamp && d.expiraEm <= request.time
+          && d.liberadaPor is string && d.horario is string && d.pedidoNovo is string
+          && horarioDaChave(d.liberadaPor, d.horario)
+          && id in get(portal).data.horarios[d.horario].travas
+          && !exists(novo) && getAfter(novo) != null
+          && getAfter(novo).data.get('substitui', '') == d.horario
+          && getAfter(novo).data.get('chave', '') == d.liberadaPor;
+      }
       allow read: if true;
       allow create: if isOwner() || travaValida();
       // a cliente só sobrescreve uma trava que já expirou
       allow update: if isOwner()
         || (resource.data.expiraEm != null
             && resource.data.expiraEm < request.time
-            && travaValida());
+            && travaValida())
+        || liberacaoValida();
       allow delete: if isOwner();
     }
   }

@@ -76,3 +76,27 @@ describe('conversão automática dos horários confirmados (I08)', () => {
     );
   });
 });
+
+describe('remarcação feita pela cliente (I14)', () => {
+  it('vira aviso de troca, com o horário antigo', async () => {
+    vi.mocked(aprovarPedido).mockReset().mockResolvedValue();
+    const troca = {
+      ...PEDIDO,
+      id: 'p2',
+      substitui: 'a1',
+      substituiInicio: inicioEm('2026-11-28', '1000'),
+    };
+    vi.mocked(observarPedidosConfirmados).mockImplementation((aoMudar) => {
+      aoMudar([troca]);
+      return () => undefined;
+    });
+    renderHook(() => useConversaoPedidos());
+    await vi.waitFor(() => expect(aprovarPedido).toHaveBeenCalled());
+    expect(vi.mocked(aprovarPedido).mock.calls[0]?.[2].aviso).toEqual({
+      tipo: 'troca',
+      texto: expect.stringContaining(
+        'o de sábado, 28 de novembro, às 10:00 passou para terça-feira, 1 de dezembro, às 09:00',
+      ),
+    });
+  });
+});

@@ -18,6 +18,7 @@ const paraPortal = (d: DocumentData): Portal => ({
       id,
       inicio: paraData(h.inicio) ?? new Date(0),
       servico: String(h.servico ?? ''),
+      servicoId: String(h.servicoId ?? ''),
       duracaoMin: Number(h.duracaoMin ?? 60),
       travas: Array.isArray(h.travas) ? h.travas.map(String) : [],
       ...(typeof h.serieId === 'string' ? { serieId: h.serieId } : {}),
@@ -46,6 +47,7 @@ export function salvarPortal(chave: string, dados: Portal) {
       {
         inicio: Timestamp.fromDate(h.inicio),
         servico: h.servico,
+        servicoId: h.servicoId,
         duracaoMin: h.duracaoMin,
         travas: h.travas,
         ...(h.serieId ? { serieId: h.serieId } : {}),

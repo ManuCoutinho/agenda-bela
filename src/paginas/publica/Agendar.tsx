@@ -13,7 +13,14 @@ import {
   ESTILO_ITEM_LISTA,
   ESTILO_LISTA,
 } from '../../componentes/estilos';
-import { dataDoDia, idsTravas, inicioEm, rotuloDia, rotuloHora } from '../../dominio/agenda';
+import {
+  dataDoDia,
+  idsTravas,
+  inicioEm,
+  rotuloDia,
+  rotuloHora,
+  rotuloInicio,
+} from '../../dominio/agenda';
 import { tituloDoMes, type MarcasDoDia } from '../../dominio/calendario';
 import { linkInstagram } from '../../dominio/configuracoes';
 import {
@@ -22,7 +29,12 @@ import {
   horariosLivres,
   type RegrasHorario,
 } from '../../dominio/horariosLivres';
-import { HorarioJaPedido, textoAvisoPedido, type DadosPedido } from '../../dominio/pedidos';
+import {
+  HorarioJaPedido,
+  textoAvisoPedido,
+  textoAvisoTroca,
+  type DadosPedido,
+} from '../../dominio/pedidos';
 import {
   arquivoIcs,
   linkArquivoIcs,
@@ -35,21 +47,32 @@ import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
-import { reservar, reservarSerie, SemInternet, type FalhaSerie } from '../../servicos/pedidos';
+import {
+  pedirCancelamento,
+  remarcar,
+  reservar,
+  reservarSerie,
+  SemInternet,
+  type FalhaSerie,
+} from '../../servicos/pedidos';
 import { datasDaSerie } from '../../dominio/series';
 import MeusHorarios from '../../componentes/MeusHorarios';
 import Campo from '../../componentes/Campo';
 import { ESTILO_CAMPO } from '../../componentes/estilos';
 import { formatarWhatsApp, normalizarWhatsApp } from '../../dominio/clientes';
-import { juntarHorarios } from '../../dominio/portal';
+import { juntarHorarios, type HorarioPortal } from '../../dominio/portal';
 import { usePortal } from '../../hooks/usePortal';
 import {
   chaveParaMarcar,
   esquecerCliente,
+  guardarCancelamentoPedido,
   guardarHorariosLocais,
+  guardarTrocado,
   guardarWhatsApp,
   lerClienteDoAparelho,
+  lerCancelamentosPedidos,
   lerHorariosLocais,
+  lerTrocados,
   type ClienteDoAparelho,
 } from '../../servicos/aparelho';
 import PaginaNaoEncontrada from '../PaginaNaoEncontrada';
@@ -96,6 +119,8 @@ type Enviado = {
   dias: string[];
   /** Horário fixo: datas que não deram certo. */
   falhas: FalhaSerie[];
+  /** I14: remarcação – quando era o horário antigo. */
+  trocadoDe?: Date;
 };
 
 function Passos({ pagina }: { pagina: PaginaPublica }) {
@@ -108,12 +133,14 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   // I13: o que este celular lembra da cliente (WhatsApp, nome e chave de "Meus horários")
   const [aparelho, setAparelho] = useState<ClienteDoAparelho | null>(lerClienteDoAparelho);
   const portal = usePortal(aparelho?.chave);
+  const trocados = lerTrocados();
   const meusHorarios = juntarHorarios(
-    portal.portal?.horarios ?? [],
+    (portal.portal?.horarios ?? []).filter((h) => !trocados.includes(h.id)),
     lerHorariosLocais().map((h) => ({
       id: `local-${h.inicio}`,
       inicio: new Date(h.inicio),
       servico: h.servico,
+      servicoId: '',
       duracaoMin: h.duracaoMin,
       travas: [],
     })),
@@ -175,11 +202,57 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
 
   const titulo = config.nome || 'Agendar horário';
   const base = { titulo, instagram: config.instagram };
+  // I14: remarcando um horário de "Meus horários" (o mesmo serviço, outro dia ou hora)
+  const remarcarId = busca.get('remarcar') ?? '';
+  const antigo = meusHorarios.find((h) => h.id === remarcarId && !h.id.startsWith('local-'));
   const ir = (params: Record<string, string>) => {
     setAviso(undefined);
     setErroEnvio(undefined);
-    setBusca(params);
+    setBusca(antigo && params.servico ? { ...params, remarcar: antigo.id } : params);
   };
+
+  async function trocar() {
+    if (!servico || !dia || !hora || !antigo || !aparelho?.chave) return;
+    setErroEnvio(undefined);
+    try {
+      await remarcar({
+        nome: aparelho.nome || portal.portal?.nome || 'Cliente',
+        whatsapp: aparelho.whatsapp,
+        servicoId: servico.id,
+        inicio: inicioEm(dia, hora),
+        travas: idsTravas(inicioEm(dia, hora), servico.duracaoMin, config.intervaloMin),
+        chave: aparelho.chave,
+        antigo,
+      });
+      guardarTrocado(antigo.id);
+      guardarHorariosLocais([
+        {
+          inicio: inicioEm(dia, hora).toISOString(),
+          servico: servico.nome,
+          duracaoMin: servico.duracaoMin,
+        },
+      ]);
+      setEnviado({
+        nome: aparelho.nome,
+        servico,
+        hora,
+        dias: [dia],
+        falhas: [],
+        trocadoDe: antigo.inicio,
+      });
+    } catch (e) {
+      if (e instanceof HorarioJaPedido) {
+        setErroEnvio(
+          'Não deu para trocar: o horário novo foi marcado por outra pessoa ou faltam menos de 24 horas para o antigo. Escolha outro ou fale no WhatsApp.',
+        );
+      } else if (e instanceof SemInternet) {
+        setErroEnvio('Sem internet no momento. Confira a conexão e tente de novo.');
+      } else {
+        console.error(e);
+        setErroEnvio('Não foi possível trocar agora. Tente de novo em alguns minutos.');
+      }
+    }
+  }
 
   async function pedir(dados: DadosPedido) {
     if (!servico || !dia || !hora) return;
@@ -292,6 +365,16 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
           horarios={meusHorarios}
           carregando={portal.carregando}
           semChave={!aparelho.chave}
+          acoes={(h) => (
+            <AcoesDoHorario
+              horario={h}
+              chave={aparelho.chave}
+              espaco={config.nome}
+              whatsappEspaco={config.whatsapp}
+              agora={agora}
+              aoRemarcar={() => setBusca({ servico: h.servicoId, remarcar: h.id })}
+            />
+          )}
           falarNoWhatsApp={
             config.whatsapp
               ? linkWhatsApp(config.whatsapp, 'Oi! Quero remarcar/cancelar meu horário. ')
@@ -337,7 +420,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   }
 
   const voltarServico = pathname;
-  const voltarDia = `${pathname}?servico=${servico.id}&mes=${mes ?? ''}`;
+  const voltarDia = `${pathname}?servico=${servico.id}&mes=${mes ?? ''}${antigo ? `&remarcar=${antigo.id}` : ''}`;
 
   if (!dia) {
     const indice = mes ? meses.indexOf(mes) : -1;
@@ -474,9 +557,22 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   const aindaLivre = carregando || horarios.includes(hora);
   return (
     <Moldura {...base} voltarPara={`${voltarDia}&dia=${dia}`}>
-      <Passo numero={4} titulo="Seus dados" />
+      <Passo numero={4} titulo={antigo ? 'Confirme a troca' : 'Seus dados'} />
       <Escolhas servico={servico} dia={dia} hora={hora} />
-      {aindaLivre ? (
+      {aindaLivre && antigo ? (
+        <div className="flex flex-col gap-4">
+          <p>
+            Trocar o horário de <span className="font-medium">{rotuloInicio(antigo.inicio)}</span>{' '}
+            por este. O antigo fica livre para outra pessoa na hora.
+          </p>
+          {erroEnvio && (
+            <p role="alert" className="text-erro">
+              {erroEnvio}
+            </p>
+          )}
+          <Botao onClick={() => void trocar()}>Trocar horário</Botao>
+        </div>
+      ) : aindaLivre ? (
         <>
           <p className="mb-4 text-texto-suave">
             Ao tocar em Marcar horário, ele já fica reservado para você.
@@ -601,11 +697,17 @@ function Confirmacao({
   const { servico, dias, hora, falhas } = enviado;
   const [primeiro] = dias as [string, ...string[]];
   const fixo = dias.length + falhas.length > 1;
-  const texto = textoAvisoPedido({
-    nome: enviado.nome,
-    servico: servico.nome,
-    quando: fixo ? `${quando(primeiro, hora)} (horário fixo)` : quando(primeiro, hora),
-  });
+  const texto = enviado.trocadoDe
+    ? textoAvisoTroca({
+        nome: enviado.nome,
+        antes: rotuloInicio(enviado.trocadoDe),
+        quando: quando(primeiro, hora),
+      })
+    : textoAvisoPedido({
+        nome: enviado.nome,
+        servico: servico.nome,
+        quando: fixo ? `${quando(primeiro, hora)} (horário fixo)` : quando(primeiro, hora),
+      });
   const eventos: EventoAgenda[] = dias.map((d) => {
     const inicio = inicioEm(d, hora);
     return {
@@ -624,7 +726,7 @@ function Confirmacao({
           <Icone nome="confirmado" className="size-12" />
         </span>
         <h2 id="enviado" className="text-titulo font-normal">
-          Horário marcado!
+          {enviado.trocadoDe ? 'Horário trocado!' : 'Horário marcado!'}
         </h2>
       </div>
       <dl className="flex flex-col gap-2 rounded-xl border border-borda bg-superficie p-4">
@@ -749,5 +851,140 @@ function PerguntaWhatsApp({ aoContinuar }: { aoContinuar: (whatsapp: string) => 
       </Campo>
       <Botao type="submit">Continuar</Botao>
     </form>
+  );
+}
+
+const DIA_MS = 24 * 3_600_000;
+
+/** I14: remarcar na hora ou pedir cancelamento; com menos de 24 h, só pelo WhatsApp. */
+function AcoesDoHorario({
+  horario,
+  chave,
+  espaco,
+  whatsappEspaco,
+  aoRemarcar,
+  agora,
+}: {
+  horario: HorarioPortal;
+  agora: Date;
+  chave?: string;
+  espaco: string;
+  whatsappEspaco: string;
+  aoRemarcar: () => void;
+}) {
+  const [cancelando, setCancelando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string>();
+  const [pedido, setPedido] = useState(() => lerCancelamentosPedidos().includes(horario.id));
+  const quando = rotuloInicio(horario.inicio);
+  const conversa = (texto: string) =>
+    whatsappEspaco ? linkWhatsApp(whatsappEspaco, texto) : undefined;
+
+  if (horario.id.startsWith('local-') || !chave) {
+    return (
+      <p className="text-texto-suave">
+        Em instantes dá para remarcar ou cancelar este horário por aqui.
+      </p>
+    );
+  }
+  if (pedido) {
+    const link = conversa(`Oi! Pedi para cancelar meu horário de ${quando}.`);
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-marca-escura">Cancelamento pedido – aguardando a confirmação.</p>
+        {link && (
+          <a href={link} target="_blank" rel="noreferrer" className={ESTILO_BOTAO.secundario}>
+            <Icone nome="conversa" />
+            Avisar no WhatsApp
+          </a>
+        )}
+      </div>
+    );
+  }
+  if (horario.inicio.getTime() - agora.getTime() < DIA_MS) {
+    const link = conversa(`Oi! Sobre meu horário de ${quando}: `);
+    return (
+      <p className="text-texto-suave">
+        Faltam menos de 24 horas: para mudar, fale direto com {espaco || 'o espaço'}
+        {link ? (
+          <>
+            {' '}
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer"
+              className="text-marca underline underline-offset-4"
+            >
+              no WhatsApp
+            </a>
+            .
+          </>
+        ) : (
+          '.'
+        )}
+      </p>
+    );
+  }
+  if (cancelando) {
+    const id = `motivo-${horario.id}`;
+    return (
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setEnviando(true);
+          setErro(undefined);
+          pedirCancelamento(chave, horario.id, motivo)
+            .then(() => {
+              guardarCancelamentoPedido(horario.id);
+              setPedido(true);
+            })
+            .catch((falha: unknown) => {
+              if (!(falha instanceof SemInternet)) console.error(falha);
+              setErro(
+                falha instanceof SemInternet
+                  ? 'Sem internet no momento. Confira a conexão e tente de novo.'
+                  : 'Não foi possível pedir agora. Fale no WhatsApp.',
+              );
+            })
+            .finally(() => setEnviando(false));
+        }}
+      >
+        <Campo id={id} rotulo="Motivo (opcional)">
+          {(a) => (
+            <input
+              {...a}
+              type="text"
+              maxLength={200}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              className={ESTILO_CAMPO}
+            />
+          )}
+        </Campo>
+        {erro && (
+          <p role="alert" className="text-erro">
+            {erro}
+          </p>
+        )}
+        <Botao type="submit" disabled={enviando}>
+          {enviando ? 'Enviando…' : 'Enviar pedido de cancelamento'}
+        </Botao>
+        <Botao variante="texto" onClick={() => setCancelando(false)}>
+          Voltar
+        </Botao>
+      </form>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Botao variante="secundario" onClick={aoRemarcar}>
+        Remarcar
+      </Botao>
+      <Botao variante="texto" onClick={() => setCancelando(true)}>
+        Pedir cancelamento
+      </Botao>
+    </div>
   );
 }

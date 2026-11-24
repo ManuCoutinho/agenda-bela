@@ -11,6 +11,7 @@ import { mostrarEmblema } from '../../servicos/emblema';
 import Lembretes from './Lembretes';
 
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
+vi.mock('../../hooks/useSolicitacoes', () => ({ useSolicitacoes: () => [] }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/agenda', () => ({ marcarLembreteEnviado: vi.fn() }));
 vi.mock('../../servicos/emblema', () => ({ mostrarEmblema: vi.fn() }));

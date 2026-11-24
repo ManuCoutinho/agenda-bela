@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { atendimentosDeAmanha, dataDoDia, somarDias } from '../dominio/agenda';
 import { mostrarEmblema } from '../servicos/emblema';
 import { useAgendamentos } from './useAgenda';
+import { useSolicitacoes } from './useSolicitacoes';
 
 /**
  * RF11: atendimentos de amanhã e quantos ainda esperam o lembrete. O número
@@ -14,9 +15,12 @@ export function useLembretes() {
   const atendimentos = atendimentosDeAmanha(dados, agora);
   const pendentes = atendimentos.filter((a) => !a.lembreteEnviado).length;
 
+  // I14: o número no ícone soma os pedidos de cancelamento esperando resposta
+  const cancelamentos = useSolicitacoes().filter((s) => s.status === 'pendente').length;
+
   useEffect(() => {
-    if (!carregando && !erro) mostrarEmblema(pendentes);
-  }, [pendentes, carregando, erro]);
+    if (!carregando && !erro) mostrarEmblema(pendentes + cancelamentos);
+  }, [pendentes, cancelamentos, carregando, erro]);
 
   return { amanha, atendimentos, pendentes, carregando, erro };
 }

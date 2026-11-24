@@ -432,3 +432,128 @@ describe('"Meus horários" (I13)', () => {
     await assertFails(reservar(outras, pedido(outras, { chave: `${CHAVE}/../x` })));
   });
 });
+
+describe('remarcar e pedir cancelamento (I14)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+  const ANTIGO = ['2026-12-01_0900', '2026-12-01_1000'];
+
+  /** Horário da cliente: travas definitivas e o portal dela (como o app da dona grava). */
+  async function horarioDaCliente(horasAteLa = 72) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const id of ANTIGO) {
+        const [data, hora] = id.split('_');
+        await db.doc(`travas/${id}`).set({ data, hora, expiraEm: null });
+      }
+      await db.doc(`portal/${CHAVE}`).set({
+        whatsapp: '5511987654321',
+        nome: 'Ana',
+        horarios: { a1: { inicio: daqui(horasAteLa), servico: 'Mão', travas: ANTIGO } },
+      });
+    });
+  }
+
+  /** Remarcação: pedido novo que substitui a1 + travas novas + solta as antigas. */
+  function remarcar(novas: string[], soltar = ANTIGO, extra: Record<string, unknown> = {}) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of novas) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    for (const id of soltar) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: CHAVE,
+        horario: 'a1',
+        pedidoNovo: ref.id,
+      });
+    }
+    lote.set(
+      ref,
+      pedido(novas, {
+        status: 'confirmado',
+        chave: CHAVE,
+        substitui: 'a1',
+        substituiInicio: daqui(72),
+        ...extra,
+      }),
+    );
+    return lote.commit();
+  }
+
+  it('remarca na hora: o horário novo fica dela e o antigo volta a ficar livre', async () => {
+    await horarioDaCliente();
+    await assertSucceeds(remarcar(['2026-12-03_1400', '2026-12-03_1500']));
+    await assertSucceeds(reservar(['2026-12-01_0900'])); // outra cliente pega o antigo
+  });
+
+  it('com menos de 24 h, não remarca', async () => {
+    await horarioDaCliente(12);
+    await assertFails(remarcar(['2026-12-03_1400']));
+  });
+
+  it('não solta trava sem marcar o horário novo (seria cancelar sem aprovação)', async () => {
+    await horarioDaCliente();
+    const db = visitante();
+    await assertFails(
+      db.doc('travas/2026-12-01_0900').set({
+        data: '2026-12-01',
+        hora: '0900',
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: CHAVE,
+        horario: 'a1',
+        pedidoNovo: 'qualquer',
+      }),
+    );
+  });
+
+  it('não solta trava que não é do horário dela', async () => {
+    await horarioDaCliente();
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc('travas/2026-12-02_0900').set({
+        data: '2026-12-02',
+        hora: '0900',
+        expiraEm: null,
+      }),
+    );
+    await assertFails(remarcar(['2026-12-03_1400'], ['2026-12-02_0900']));
+  });
+
+  it('chave errada não remarca', async () => {
+    await horarioDaCliente();
+    await assertFails(remarcar(['2026-12-03_1400'], ANTIGO, { chave: 'outraChaveQualquer12345' }));
+  });
+
+  it('pede cancelamento do próprio horário, com 24 h ou mais', async () => {
+    await horarioDaCliente();
+    const pedirCancelamento = (horario: string, chave = CHAVE) =>
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave,
+        horario,
+        motivo: 'Viagem',
+        criadoEm: serverTimestamp(),
+      });
+    await assertSucceeds(pedirCancelamento('a1'));
+    await assertFails(pedirCancelamento('a2'));
+    await assertFails(pedirCancelamento('a1', 'outraChaveQualquer12345'));
+    await assertFails(visitante().collection('solicitacoes').get());
+  });
+
+  it('com menos de 24 h, não pede cancelamento', async () => {
+    await horarioDaCliente(12);
+    await assertFails(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: 'a1',
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+});

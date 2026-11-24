@@ -11,12 +11,14 @@ import { bloquearHorario } from '../../servicos/bloqueios';
 import Hoje from './Hoje';
 
 vi.mock('../../hooks/useAgenda', () => ({ useAgendamentos: vi.fn() }));
+vi.mock('../../hooks/useSolicitacoes', () => ({ useSolicitacoes: () => [] }));
 vi.mock('../../hooks/useBloqueios', () => ({ useBloqueios: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
 vi.mock('../../servicos/bloqueios', () => ({ bloquearHorario: vi.fn() }));
 // os pedidos têm o próprio teste (PedidosPendentes.test.tsx)
 vi.mock('./PedidosPendentes', () => ({ default: () => null }));
 vi.mock('./AjusteHorarios', () => ({ default: () => null }));
+vi.mock('./PedidosCancelamento', () => ({ default: () => null }));
 vi.mock('./LembreteAbrirMes', () => ({ default: () => null }));
 
 const ag = (id: string, hora: string, status: Agendamento['status'] = 'marcado'): Agendamento => ({

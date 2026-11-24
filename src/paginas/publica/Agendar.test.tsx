@@ -9,7 +9,7 @@ import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import { usePortal } from '../../hooks/usePortal';
 import type { PaginaPublica } from '../../servicos/configPublica';
-import { reservar, reservarSerie } from '../../servicos/pedidos';
+import { pedirCancelamento, remarcar, reservar, reservarSerie } from '../../servicos/pedidos';
 import Agendar from './Agendar';
 
 vi.mock('../../hooks/usePaginaPublica', () => ({ usePaginaPublica: vi.fn() }));
@@ -27,6 +27,8 @@ vi.mock('../../servicos/pedidos', async () => {
   return {
     reservar: vi.fn(),
     reservarSerie: vi.fn(),
+    remarcar: vi.fn(),
+    pedirCancelamento: vi.fn(),
     SemInternet: class extends Error {},
     HorarioJaPedido: Ocupado,
   };
@@ -268,6 +270,7 @@ describe('Página pública (RF08, RF09)', () => {
             id: 'a1',
             inicio: inicioEm('2026-12-08', '0900'),
             servico: 'Mão',
+            servicoId: 's1',
             duracaoMin: 60,
             travas: ['2026-12-08_0900'],
           },
@@ -283,6 +286,70 @@ describe('Página pública (RF08, RF09)', () => {
     expect(screen.getByLabelText('Seu WhatsApp com DDD')).toHaveValue('(41) 98860-6636');
     renderizar();
     expect(screen.getAllByText('terça-feira, 8 de dezembro, às 09:00').length).toBeGreaterThan(0);
+  });
+
+  describe('I14: remarcar e pedir cancelamento', () => {
+    const CHAVE = 'k'.repeat(24);
+    const longe = {
+      id: 'a1',
+      inicio: inicioEm('2026-12-08', '0900'),
+      servico: 'Mão',
+      servicoId: 's1',
+      duracaoMin: 60,
+      travas: ['2026-12-08_0900', '2026-12-08_1000'],
+    };
+    const perto = { ...longe, id: 'a2', inicio: inicioEm('2026-11-21', '0800'), travas: [] };
+
+    beforeEach(() => {
+      localStorage.setItem(
+        'agenda-bela:cliente',
+        JSON.stringify({ nome: 'Ana', whatsapp: '5541988606636', chave: CHAVE }),
+      );
+      vi.mocked(usePortal).mockReturnValue({
+        portal: { nome: 'Ana', whatsapp: '5541988606636', horarios: [perto, longe] },
+        carregando: false,
+        erro: false,
+      });
+      vi.mocked(remarcar).mockReset().mockResolvedValue();
+      vi.mocked(pedirCancelamento).mockReset().mockResolvedValue();
+      ocupados();
+    });
+
+    it('com menos de 24 h, só pelo WhatsApp', () => {
+      renderizar();
+      expect(screen.getByText(/Faltam menos de 24 horas/)).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Remarcar' })).toHaveLength(1);
+    });
+
+    it('pede cancelamento com motivo e mostra que está aguardando', async () => {
+      renderizar();
+      await userEvent.click(screen.getByRole('button', { name: 'Pedir cancelamento' }));
+      await userEvent.type(screen.getByLabelText('Motivo (opcional)'), 'Viagem');
+      await userEvent.click(screen.getByRole('button', { name: 'Enviar pedido de cancelamento' }));
+      expect(pedirCancelamento).toHaveBeenCalledWith(CHAVE, 'a1', 'Viagem');
+      expect(
+        await screen.findByText('Cancelamento pedido – aguardando a confirmação.'),
+      ).toBeInTheDocument();
+    });
+
+    it('remarca na hora: escolhe o dia e a hora e confirma a troca', async () => {
+      renderizar();
+      await userEvent.click(screen.getByRole('button', { name: 'Remarcar' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
+      await userEvent.click(screen.getByRole('button', { name: 'terça-feira, 1 de dezembro' }));
+      await userEvent.click(screen.getByRole('button', { name: '09:00' }));
+      expect(screen.getByRole('heading', { name: 'Confirme a troca' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Trocar horário' }));
+      expect(remarcar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chave: CHAVE,
+          servicoId: 's1',
+          inicio: inicioEm('2026-12-01', '0900'),
+          antigo: expect.objectContaining({ id: 'a1', travas: longe.travas }),
+        }),
+      );
+      expect(await screen.findByRole('heading', { name: 'Horário trocado!' })).toBeInTheDocument();
+    });
   });
 
   it('RF14: página pausada mostra o aviso e não deixa pedir', () => {

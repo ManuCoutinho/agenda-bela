@@ -9,6 +9,7 @@ export type HorarioPortal = {
   id: string;
   inicio: Date;
   servico: string;
+  servicoId: string;
   duracaoMin: number;
   /** Travas do horário: a remarcação pela cliente libera exatamente estas (I14). */
   travas: string[];
@@ -36,6 +37,7 @@ export function horariosDoPortal(
       id: a.id,
       inicio: a.inicio,
       servico: a.servicoNome,
+      servicoId: a.servicoId,
       duracaoMin: a.duracaoMin,
       travas: a.travas,
       ...(a.serieId ? { serieId: a.serieId } : {}),

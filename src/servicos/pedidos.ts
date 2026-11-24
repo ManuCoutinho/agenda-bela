@@ -133,6 +133,8 @@ const paraPedido = (id: string, d: DocumentData): Pedido => ({
   serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
   semAviso: d.semAviso === true ? true : undefined,
   chave: typeof d.chave === 'string' ? d.chave : undefined,
+  substitui: typeof d.substitui === 'string' ? d.substitui : undefined,
+  substituiInicio: paraData(d.substituiInicio) ?? undefined,
 });
 
 function observarPorStatus(
@@ -264,10 +266,13 @@ export async function aprovarPedido(
     for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
       tx.delete(doc(travas, id));
     }
+    // I14: remarcação da cliente move o atendimento dela; as travas antigas ela já soltou
     const atendimento =
       substitui?.tipo === 'agendamento'
         ? doc(agendamentos, substitui.agendamento.id)
-        : doc(agendamentos);
+        : pedido.substitui
+          ? doc(agendamentos, pedido.substitui)
+          : doc(agendamentos);
     tx.update(doc(pedidos, pedido.id), {
       status: 'aprovado',
       respondidoEm: serverTimestamp(),
@@ -286,10 +291,11 @@ export async function aprovarPedido(
       ...(pedido.serieId ? { serieId: pedido.serieId } : {}),
       atualizadoEm: serverTimestamp(),
     };
-    if (substitui?.tipo === 'agendamento') {
+    if (substitui?.tipo === 'agendamento' || pedido.substitui) {
       // o atendimento muda de horário: o lembrete do dia antigo não vale mais
       tx.update(atendimento, {
         ...dadosDoServico,
+        ...(pedido.substitui ? { status: 'marcado' } : {}),
         lembreteEm: deleteField(),
         confirmacaoEm: deleteField(),
       });
@@ -435,4 +441,51 @@ export async function reservarSerie(
     }
   }
   return { reservadas, falhas };
+}
+
+/**
+ * I14: a cliente troca um horário dela (de "Meus horários") por outro, na
+ * hora: num só lote marca o novo (pedido confirmado que substitui o antigo) e
+ * solta as travas do antigo. As regras só aceitam com 24 h ou mais de
+ * antecedência e com a chave do aparelho dela.
+ */
+export async function remarcar(
+  dados: DadosReserva & {
+    chave: string;
+    antigo: { id: string; inicio: Date; travas: readonly string[] };
+  },
+): Promise<void> {
+  if (!navigator.onLine) throw new SemInternet();
+  const ref = doc(pedidos);
+  const lote = writeBatch(db);
+  incluirReserva(lote, ref, dados, {
+    substitui: dados.antigo.id,
+    substituiInicio: Timestamp.fromDate(dados.antigo.inicio),
+  });
+  for (const id of dados.antigo.travas.filter((t) => !dados.travas.includes(t))) {
+    const [data, hora] = id.split('_');
+    lote.set(doc(travas, id), {
+      data,
+      hora,
+      expiraEm: Timestamp.fromMillis(0),
+      liberadaPor: dados.chave,
+      horario: dados.antigo.id,
+      pedidoNovo: ref.id,
+    });
+  }
+  await gravarReserva(lote);
+}
+
+/** I14: a cliente pede para cancelar; a manicure aprova ou recusa. */
+export async function pedirCancelamento(chave: string, horario: string, motivo: string) {
+  if (!navigator.onLine) throw new SemInternet();
+  await gravarReserva(
+    writeBatch(db).set(doc(collection(db, 'solicitacoes')), {
+      tipo: 'cancelamento',
+      chave,
+      horario,
+      ...(motivo.trim() ? { motivo: motivo.trim().slice(0, 200) } : {}),
+      criadoEm: serverTimestamp(),
+    }),
+  );
 }

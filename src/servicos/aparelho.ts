@@ -65,3 +65,15 @@ export function guardarHorariosLocais(novos: readonly HorarioLocal[]) {
   const atuais = lerHorariosLocais().filter((h) => Date.parse(h.inicio) > agora);
   gravar(CHAVE_HORARIOS, [...atuais, ...novos]);
 }
+
+const CHAVE_TROCADOS = 'agenda-bela:trocados';
+const CHAVE_CANCELAMENTOS = 'agenda-bela:cancelamentos';
+
+/** I14: horários que este aparelho remarcou (somem antes de o app da dona atualizar). */
+export const lerTrocados = () => ler<string[]>(CHAVE_TROCADOS) ?? [];
+export const guardarTrocado = (id: string) => gravar(CHAVE_TROCADOS, [...lerTrocados(), id]);
+
+/** I14: horários com cancelamento pedido por este aparelho, esperando a manicure. */
+export const lerCancelamentosPedidos = () => ler<string[]>(CHAVE_CANCELAMENTOS) ?? [];
+export const guardarCancelamentoPedido = (id: string) =>
+  gravar(CHAVE_CANCELAMENTOS, [...lerCancelamentosPedidos(), id]);

@@ -18,10 +18,13 @@ import {
   expiracaoDoPedido,
   HorarioJaPedido,
   pedidoExpirado,
+  type Aviso,
+  type AvisoPendente,
   type DadosPedido,
   type OutroHorario,
   type Pedido,
   type StatusPedido,
+  type TipoAviso,
 } from '../dominio/pedidos';
 import type { Servico } from '../dominio/servicos';
 import { db, gravarEmSegundoPlano } from './firebase';
@@ -116,25 +119,69 @@ export function observarPedidosPendentes(
   );
 }
 
+const TIPOS_AVISO: readonly TipoAviso[] = ['confirmacao', 'troca', 'recusa'];
+
+const paraAviso = (pedidoId: string, d: DocumentData): AvisoPendente[] => {
+  const aviso: unknown = d.aviso;
+  if (typeof aviso !== 'object' || aviso === null) return [];
+  const { tipo, texto } = aviso as Record<string, unknown>;
+  if (!TIPOS_AVISO.includes(tipo as TipoAviso) || typeof texto !== 'string') return [];
+  return [
+    {
+      pedidoId,
+      nome: String(d.nome ?? ''),
+      whatsapp: String(d.whatsapp ?? ''),
+      inicio: paraData(d.inicio) ?? new Date(0),
+      tipo: tipo as TipoAviso,
+      texto,
+    },
+  ];
+};
+
+/** Respostas já dadas cuja mensagem ainda não foi mandada à cliente (RF10). */
+export function observarAvisosPendentes(
+  aoMudar: (avisos: AvisoPendente[]) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(pedidos, where('avisadoEm', '==', null)),
+    (snap) =>
+      aoMudar(
+        snap.docs
+          .flatMap((d) => paraAviso(d.id, d.data()))
+          .sort((a, b) => a.inicio.getTime() - b.inicio.getTime()),
+      ),
+    aoFalhar,
+  );
+}
+
+/** A manicure abriu (ou dispensou) a mensagem: o aviso sai da fila. Funciona offline. */
+export function marcarAvisado(pedidoId: string) {
+  gravarEmSegundoPlano(updateDoc(doc(pedidos, pedidoId), { avisadoEm: serverTimestamp() }));
+}
+
 /**
  * RF10: aprova numa transação – confirma as travas (`expiraEm: null`), cria o
- * atendimento (e a cliente, se ainda não existe) e marca o pedido como aprovado.
+ * atendimento (e a cliente, se ainda não existe), marca o pedido como aprovado
+ * e guarda nele a mensagem a mandar.
  * Se o pedido expirou (RN02) e outra pessoa pegou o horário, lança `HorarioOcupado`.
  */
 export async function aprovarPedido(
   pedido: Pedido,
   servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number },
   {
+    aviso,
     clienteId,
     substitui,
     sinalCentavos,
   }: {
+    aviso: Aviso;
     clienteId?: string;
     /** Troca de horário: o atendimento ou pedido antigo da cliente. */
     substitui?: OutroHorario;
     /** Sinal pedido na confirmação (não se aplica à troca). */
     sinalCentavos?: number;
-  } = {},
+  },
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const agora = new Date();
@@ -156,7 +203,12 @@ export async function aprovarPedido(
     for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
       tx.delete(doc(travas, id));
     }
-    tx.update(doc(pedidos, pedido.id), { status: 'aprovado', respondidoEm: serverTimestamp() });
+    tx.update(doc(pedidos, pedido.id), {
+      status: 'aprovado',
+      respondidoEm: serverTimestamp(),
+      aviso,
+      avisadoEm: null,
+    });
 
     const dadosDoServico = {
       servicoId: servico.id,
@@ -223,12 +275,18 @@ function travasQueSaem(substitui: OutroHorario | undefined, agora: Date): string
  * Recusa e solta as travas. Depois de 24 h as travas já soltaram sozinhas e
  * podem ser de outra pessoa: aí só o pedido muda. Funciona offline.
  */
-export function recusarPedido(pedido: Pedido) {
+export function recusarPedido(pedido: Pedido, texto: string) {
   const lote = writeBatch(db);
   if (!pedidoExpirado(pedido, new Date())) {
     for (const id of pedido.travas) lote.delete(doc(travas, id));
   }
-  lote.update(doc(pedidos, pedido.id), { status: 'recusado', respondidoEm: serverTimestamp() });
+  const aviso: Aviso = { tipo: 'recusa', texto };
+  lote.update(doc(pedidos, pedido.id), {
+    status: 'recusado',
+    respondidoEm: serverTimestamp(),
+    aviso,
+    avisadoEm: null,
+  });
   gravarEmSegundoPlano(lote.commit());
 }
 

@@ -24,6 +24,23 @@ export type Pedido = {
   criadoEm: Date;
 };
 
+export type TipoAviso = 'confirmacao' | 'troca' | 'recusa';
+
+/** Mensagem pronta para a cliente, gravada no pedido ao responder. */
+export type Aviso = { tipo: TipoAviso; texto: string };
+
+/**
+ * Resposta que a manicure ainda não mandou no WhatsApp. Fica no Firestore
+ * (`avisadoEm: null`) porque abrir o WhatsApp pode recarregar o app e apagar
+ * o que estivesse só na tela.
+ */
+export type AvisoPendente = Aviso & {
+  pedidoId: string;
+  nome: string;
+  whatsapp: string;
+  inicio: Date;
+};
+
 /** RN02: passadas 24 h sem resposta, as travas soltam e o horário volta a ficar livre. */
 export const pedidoExpirado = (p: Pick<Pedido, 'criadoEm'>, agora: Date) =>
   agora.getTime() - p.criadoEm.getTime() >= VALIDADE_PEDIDO_MS - FOLGA_RELOGIO_MS;

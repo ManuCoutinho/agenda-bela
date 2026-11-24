@@ -66,7 +66,7 @@ async function ateOsDados() {
 async function preencher() {
   await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
   await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
-  await userEvent.click(screen.getByRole('button', { name: 'Pedir horário' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Marcar horário' }));
 }
 
 describe('Página pública (RF08, RF09)', () => {
@@ -161,10 +161,10 @@ describe('Página pública (RF08, RF09)', () => {
       inicio: inicioEm('2026-12-01', '0900'),
       travas: ['2026-12-01_0900', '2026-12-01_1000'], // 1 h + 30 min de intervalo = 2 h
     });
-    expect(await screen.findByRole('heading', { name: 'Pedido enviado!' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Horário marcado!' })).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Avisar no WhatsApp' });
     expect(link.getAttribute('href')).toMatch(
-      /^https:\/\/wa\.me\/5541900000000\?text=Oi!%20Sou%20Ana/,
+      /^https:\/\/wa\.me\/5541900000000\?text=Oi!%20Sou%20Ana%20e%20acabei%20de%20marcar/,
     );
   });
 
@@ -174,7 +174,7 @@ describe('Página pública (RF08, RF09)', () => {
     await ateOsDados();
     await preencher();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Esse horário acabou de ser pedido por outra pessoa. Escolha outro.',
+      'Esse horário acabou de ser marcado por outra pessoa. Escolha outro.',
     );
     expect(screen.getByRole('heading', { name: 'Escolha o horário' })).toBeInTheDocument();
   });

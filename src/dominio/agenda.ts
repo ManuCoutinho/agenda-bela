@@ -222,3 +222,7 @@ export function atendimentosDeAmanha(agendamentos: readonly Agendamento[], agora
     (a) => a.status === 'marcado',
   );
 }
+
+/** Instante → 'terça-feira, 1 de dezembro, às 09:00' (São Paulo). */
+export const rotuloInicio = (inicio: Date) =>
+  `${rotuloDia(dataDoDia(inicio))}, às ${rotuloHora(horaDe(inicio))}`;

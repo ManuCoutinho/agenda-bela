@@ -145,10 +145,10 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
     } catch (e) {
       if (e instanceof HorarioJaPedido) {
         setBusca({ servico: servico.id, dia });
-        setAviso('Esse horário acabou de ser pedido por outra pessoa. Escolha outro.');
+        setAviso('Esse horário acabou de ser marcado por outra pessoa. Escolha outro.');
       } else if (e instanceof SemInternet) {
         setErroEnvio(
-          'Sem internet no momento. Confira a conexão e toque de novo em Pedir horário.',
+          'Sem internet no momento. Confira a conexão e toque de novo em Marcar horário.',
         );
       } else {
         console.error(e);
@@ -368,8 +368,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
       {aindaLivre ? (
         <>
           <p className="mb-4 text-texto-suave">
-            É um pedido: {config.nome || 'o espaço'} confirma pelo WhatsApp. O horário fica guardado
-            para você por até 24 horas.
+            Ao tocar em Marcar horário, ele já fica reservado para você.
           </p>
           <FormularioPedido aoEnviar={pedir} erro={erroEnvio} />
         </>
@@ -491,14 +490,13 @@ function Confirmacao({
       </span>
       <div className="flex flex-col gap-2">
         <h2 id="enviado" className="text-titulo font-normal">
-          Pedido enviado!
+          Horário marcado!
         </h2>
         <p className="first-letter:uppercase">
           {enviado.servico}: {quando(enviado.dia, enviado.hora)}.
         </p>
         <p className="text-texto-suave">
-          {espaco || 'O espaço'} vai confirmar pelo WhatsApp. O horário fica guardado por até 24
-          horas.
+          {espaco || 'O espaço'} manda a confirmação pelo WhatsApp.
         </p>
       </div>
       <div className="flex flex-col gap-3">
@@ -514,7 +512,7 @@ function Confirmacao({
           </a>
         )}
         <Botao variante="secundario" onClick={aoPedirOutro}>
-          Pedir outro horário
+          Marcar outro horário
         </Botao>
       </div>
     </section>

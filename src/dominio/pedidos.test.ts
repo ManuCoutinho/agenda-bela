@@ -46,8 +46,8 @@ describe('pedidos (RF09, RN02)', () => {
         quando: 'terça-feira, 1 de dezembro, às 09:00',
       }),
     ).toBe(
-      'Oi! Sou Ana e acabei de pedir um horário de Mão para terça-feira, 1 de dezembro, às 09:00 ' +
-        'pela sua página de agendamento. Fico no aguardo da confirmação!',
+      'Oi! Sou Ana e acabei de marcar um horário de Mão para terça-feira, 1 de dezembro, às 09:00 ' +
+        'pela sua página de agendamento. Até lá!',
     );
   });
 });

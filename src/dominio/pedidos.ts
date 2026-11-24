@@ -10,7 +10,8 @@ const FOLGA_RELOGIO_MS = 10 * 60_000;
 export const expiracaoDoPedido = (agora: Date) =>
   new Date(agora.getTime() + VALIDADE_PEDIDO_MS - FOLGA_RELOGIO_MS);
 
-export type StatusPedido = 'pendente' | 'aprovado' | 'recusado' | 'expirado';
+/** `confirmado`: a cliente marcou e o horário já é dela (I08); o app da manicure cria o atendimento. */
+export type StatusPedido = 'pendente' | 'confirmado' | 'aprovado' | 'recusado' | 'expirado';
 
 /** Pedido da cliente pela página pública (RF09); só a manicure lê. */
 export type Pedido = {
@@ -73,8 +74,8 @@ export type DadosPedido = z.output<typeof esquemaPedido>;
 
 /** Mensagem que a cliente manda à manicure depois de pedir ("Avisar no WhatsApp"). */
 export const textoAvisoPedido = (p: { nome: string; servico: string; quando: string }) =>
-  `Oi! Sou ${p.nome} e acabei de pedir um horário de ${p.servico} para ${p.quando} ` +
-  'pela sua página de agendamento. Fico no aguardo da confirmação!';
+  `Oi! Sou ${p.nome} e acabei de marcar um horário de ${p.servico} para ${p.quando} ` +
+  'pela sua página de agendamento. Até lá!';
 
 /** Mensagem da manicure ao aprovar (abre no WhatsApp da cliente). */
 export const textoConfirmacao = (p: {

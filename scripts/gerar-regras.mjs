@@ -23,7 +23,7 @@ function lerDoEnvLocal(nome) {
     .trim()
     .replace(/^["']|["']$/g, '');
 }
-const REGEX = /^[A-Za-z0-9_-]{6,128}$/
+const REGEX = /^[A-Za-z0-9_-]{6,128}$/;
 const teste = process.argv.includes('--teste');
 const uidOwner = teste ? UID_DE_TESTE : (process.env.UID_OWNER ?? lerDoEnvLocal('UID_OWNER'));
 const uidService = teste ? UID_DE_TESTE : (process.env.UID_SERVICE ?? lerDoEnvLocal('UID_SERVICE'));
@@ -37,11 +37,14 @@ if ((!uidOwner && !uidService) || !REGEX.test(uidOwner) || !REGEX.test(uidServic
 }
 
 const modelo = readFileSync(MODELO, 'utf8');
-if (!modelo.includes(`'${MARCADOR}'` )|| !modelo.includes(`'${MARCADOR_SERVICO}'`)) {
+if (!modelo.includes(`'${MARCADOR}'`) || !modelo.includes(`'${MARCADOR_SERVICO}'`)) {
   console.error(`O ${MODELO} precisa ter '${MARCADOR}' no lugar do UID.`);
   process.exit(1);
 }
 
 mkdirSync('.firebase', { recursive: true });
-writeFileSync(DESTINO, modelo.replaceAll(MARCADOR, uidOwner).replaceAll(MARCADOR_SERVICO, uidService));
+writeFileSync(
+  DESTINO,
+  modelo.replaceAll(MARCADOR, uidOwner).replaceAll(MARCADOR_SERVICO, uidService),
+);
 process.stdout.write(`Regras geradas em ${DESTINO}${teste ? ' (UID de teste)' : ''}.\n`);

@@ -15,7 +15,6 @@ import {
 } from 'firebase/firestore';
 import { HorarioOcupado, travaLivre } from '../dominio/agenda';
 import {
-  expiracaoDoPedido,
   HorarioJaPedido,
   pedidoExpirado,
   type Aviso,
@@ -43,27 +42,27 @@ export class SemInternet extends Error {
 }
 
 /**
- * RF09: a cliente pede o horário. Num só lote grava as travas (pendentes por
- * até 24 h) e o pedido. Se alguma trava já estiver ativa, as regras recusam o
- * lote inteiro e nada é gravado: lança `HorarioJaPedido`.
+ * RF09/I08: a cliente marca o horário, já confirmado. Num só lote grava o pedido
+ * `confirmado` e as travas definitivas dele. Se alguma trava já estiver ocupada,
+ * as regras recusam o lote inteiro e nada é gravado: lança `HorarioJaPedido`.
  */
 export async function reservar(
   dados: DadosPedido & { servicoId: string; inicio: Date; travas: string[] },
 ): Promise<void> {
   if (!navigator.onLine) throw new SemInternet();
-  const expiraEm = Timestamp.fromDate(expiracaoDoPedido(new Date()));
+  const ref = doc(pedidos);
   const lote = writeBatch(db);
   for (const id of dados.travas) {
     const [data, hora] = id.split('_');
-    lote.set(doc(travas, id), { data, hora, expiraEm });
+    lote.set(doc(travas, id), { data, hora, expiraEm: null, pedidoId: ref.id });
   }
-  lote.set(doc(pedidos), {
+  lote.set(ref, {
     nome: dados.nome,
     whatsapp: dados.whatsapp,
     servicoId: dados.servicoId,
     inicio: Timestamp.fromDate(dados.inicio),
     consentimento: true,
-    status: 'pendente',
+    status: 'confirmado',
     criadoEm: serverTimestamp(),
     travas: dados.travas,
   });
@@ -88,7 +87,13 @@ const agendamentos = collection(db, 'agendamentos');
 const clientes = collection(db, 'clientes');
 
 const paraData = (v: unknown) => (v instanceof Timestamp ? v.toDate() : null);
-const STATUS: readonly StatusPedido[] = ['pendente', 'aprovado', 'recusado', 'expirado'];
+const STATUS: readonly StatusPedido[] = [
+  'pendente',
+  'confirmado',
+  'aprovado',
+  'recusado',
+  'expirado',
+];
 
 const paraPedido = (id: string, d: DocumentData): Pedido => ({
   id,
@@ -102,13 +107,13 @@ const paraPedido = (id: string, d: DocumentData): Pedido => ({
   criadoEm: paraData(d.criadoEm) ?? new Date(),
 });
 
-/** Pedidos esperando resposta, do mais próximo ao mais distante (RF10). */
-export function observarPedidosPendentes(
+function observarPorStatus(
+  status: StatusPedido,
   aoMudar: (pedidos: Pedido[]) => void,
   aoFalhar: (erro: Error) => void,
 ) {
   return onSnapshot(
-    query(pedidos, where('status', '==', 'pendente')),
+    query(pedidos, where('status', '==', status)),
     (snap) =>
       aoMudar(
         snap.docs
@@ -118,6 +123,18 @@ export function observarPedidosPendentes(
     aoFalhar,
   );
 }
+
+/** Pedidos esperando resposta, do mais próximo ao mais distante (RF10). */
+export const observarPedidosPendentes = (
+  aoMudar: (pedidos: Pedido[]) => void,
+  aoFalhar: (erro: Error) => void,
+) => observarPorStatus('pendente', aoMudar, aoFalhar);
+
+/** I08: horários que as clientes já confirmaram e ainda não viraram atendimento. */
+export const observarPedidosConfirmados = (
+  aoMudar: (pedidos: Pedido[]) => void,
+  aoFalhar: (erro: Error) => void,
+) => observarPorStatus('confirmado', aoMudar, aoFalhar);
 
 const TIPOS_AVISO: readonly TipoAviso[] = ['confirmacao', 'troca', 'recusa'];
 
@@ -185,14 +202,20 @@ export async function aprovarPedido(
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const agora = new Date();
-    const expirado = pedidoExpirado(pedido, agora);
+    const atual = await tx.get(doc(pedidos, pedido.id));
+    const status = atual.data()?.status;
+    // já virou atendimento (outra aba ou outra abertura do app): nada a fazer
+    if (status !== 'pendente' && status !== 'confirmado') return;
+    const expirado = status === 'pendente' && pedidoExpirado(pedido, agora);
     const antigas = travasQueSaem(substitui, agora);
     for (const id of pedido.travas) {
       if (antigas.includes(id)) continue;
       const snap = await tx.get(doc(travas, id));
       const expiraEm = snap.exists() ? paraData(snap.data().expiraEm) : undefined;
-      // dentro das 24 h a trava pendente é deste pedido; depois, só se ficou livre
-      const nossa = !expirado && expiraEm !== null && expiraEm !== undefined;
+      // pedido confirmado (I08): a trava definitiva é dele; pendente: só dentro das 24 h
+      const nossa =
+        snap.data()?.pedidoId === pedido.id ||
+        (!expirado && expiraEm !== null && expiraEm !== undefined);
       if (!nossa && !travaLivre(expiraEm, agora)) throw new HorarioOcupado();
     }
 

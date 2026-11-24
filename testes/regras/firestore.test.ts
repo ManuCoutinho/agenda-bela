@@ -260,3 +260,88 @@ describe('pedidos (HU03)', () => {
     await assertSucceeds(manicure().collection('pedidos').get());
   });
 });
+
+describe('confirmação automática (I08)', () => {
+  /** Simula `reservar` atual: pedido confirmado e travas definitivas dele, no mesmo lote. */
+  function confirmar(ids: string[], extra: Record<string, unknown> = {}, travaExtra = {}) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of ids) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: null,
+        pedidoId: ref.id,
+        ...travaExtra,
+      });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', ...extra }));
+    return { ref, commit: () => lote.commit() };
+  }
+
+  it('cliente confirma na hora: pedido confirmado e travas definitivas', async () => {
+    const { commit } = confirmar(['2026-12-01_0900', '2026-12-01_1000']);
+    await assertSucceeds(commit());
+    const t = await manicure().doc('travas/2026-12-01_0900').get();
+    expect(t.data()?.expiraEm).toBeNull();
+  });
+
+  it('segunda cliente no mesmo horário é recusada', async () => {
+    await confirmar(['2026-12-01_0900']).commit();
+    await assertFails(confirmar(['2026-12-01_0900']).commit());
+    await assertFails(reservar(['2026-12-01_0900']));
+  });
+
+  it('trava definitiva sem o pedido no mesmo lote é recusada', async () => {
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null, pedidoId: 'p1' }),
+    );
+  });
+
+  it('trava definitiva sem pedidoId é recusada', async () => {
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null }),
+    );
+  });
+
+  it('pedido confirmado com trava de outro horário não serve', async () => {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    lote.set(db.doc('travas/2026-12-01_0900'), {
+      data: '2026-12-01',
+      hora: '0900',
+      expiraEm: null,
+      pedidoId: ref.id,
+    });
+    lote.set(ref, pedido(['2026-12-01_1000'], { status: 'confirmado' }));
+    await assertFails(lote.commit());
+  });
+
+  it('não prende de novo um horário cancelado usando um pedido antigo', async () => {
+    const { ref, commit } = confirmar(['2026-12-01_0900']);
+    await commit();
+    await manicure().doc('travas/2026-12-01_0900').delete(); // manicure cancelou
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null, pedidoId: ref.id }),
+    );
+  });
+
+  it('pedido confirmado também respeita mês aberto e pausa', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx
+        .firestore()
+        .doc('config/publico')
+        .set({ pausa: { ativa: true, aviso: '' } }),
+    );
+    await assertFails(confirmar(['2026-12-01_0900']).commit());
+  });
+});

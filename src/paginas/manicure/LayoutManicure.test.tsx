@@ -6,6 +6,7 @@ import LayoutManicure from './LayoutManicure';
 
 vi.mock('../../servicos/autenticacao', () => ({ sair: vi.fn() }));
 vi.mock('../../hooks/useMigracoes', () => ({ useMigracoes: vi.fn() }));
+vi.mock('../../hooks/useConversaoPedidos', () => ({ useConversaoPedidos: vi.fn() }));
 
 function renderizar(estado: EstadoAuth) {
   return render(

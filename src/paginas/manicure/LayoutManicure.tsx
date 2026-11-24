@@ -3,6 +3,7 @@ import BarraInferior from '../../componentes/BarraInferior';
 import Carregando from '../../componentes/Carregando';
 import { ESTILO_FOLHA } from '../../componentes/estilos';
 import { useAuth } from '../../hooks/useAuth';
+import { useConversaoPedidos } from '../../hooks/useConversaoPedidos';
 import { useMigracoes } from '../../hooks/useMigracoes';
 import AcessoNegado from '../AcessoNegado';
 
@@ -27,7 +28,9 @@ export default function LayoutManicure() {
   );
 }
 
+/** Rotinas da dona com o app aberto: conversão de dados antigos e horários novos. */
 function Migracoes() {
   useMigracoes();
+  useConversaoPedidos();
   return null;
 }

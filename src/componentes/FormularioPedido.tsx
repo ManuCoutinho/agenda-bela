@@ -57,7 +57,7 @@ export default function FormularioPedido({ aoEnviar, erro }: Props) {
       </Campo>
 
       <p className="text-texto-suave">
-        Ao pedir o horário, seu nome e WhatsApp ficam guardados só para este agendamento e os
+        Ao marcar o horário, seu nome e WhatsApp ficam guardados só para este agendamento e os
         lembretes dele.
       </p>
 
@@ -68,7 +68,7 @@ export default function FormularioPedido({ aoEnviar, erro }: Props) {
       )}
 
       <Botao type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Enviando…' : 'Pedir horário'}
+        {isSubmitting ? 'Marcando…' : 'Marcar horário'}
       </Botao>
     </form>
   );

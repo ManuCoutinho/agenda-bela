@@ -7,8 +7,13 @@ service cloud.firestore {
       return '__UID_DA_MANICURE__';
     }
 
+    function uidService() {
+      return '__UID_SERVICE__';
+    }
+
+
     function isOwner() {
-      return request.auth != null && request.auth.uid == uidDaManicure();
+      return request.auth != null && request.auth.uid == uidDaManicure() || request.auth.uid == uidService();
     }
 
     match /config/{doc} {

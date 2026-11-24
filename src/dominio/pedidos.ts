@@ -66,11 +66,6 @@ export const esquemaPedido = z.object({
     }
     return numero;
   }),
-  // LGPD: a cliente autoriza o uso dos dados para o agendamento
-  consentimento: z
-    .boolean()
-    .refine((v) => v, 'Marque a autorização para enviar o pedido.')
-    .transform(() => true as const),
 });
 
 export type CamposPedido = z.input<typeof esquemaPedido>;

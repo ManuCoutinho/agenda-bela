@@ -58,7 +58,6 @@ async function ateOsDados() {
 async function preencher() {
   await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
   await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
-  await userEvent.click(screen.getByLabelText(/Autorizo/));
   await userEvent.click(screen.getByRole('button', { name: 'Pedir horário' }));
 }
 
@@ -106,12 +105,13 @@ describe('Página pública (RF08, RF09)', () => {
     vi.mocked(useOcupados).mockReturnValue({ dados: new Set(), carregando: false, erro: false });
     vi.mocked(reservar).mockResolvedValue();
     await ateOsDados();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByText(/ficam guardados só para este agendamento/)).toBeInTheDocument();
     await preencher();
 
     expect(reservar).toHaveBeenCalledWith({
       nome: 'Ana',
       whatsapp: '5541988606636',
-      consentimento: true,
       servicoId: 's1',
       inicio: inicioEm('2026-12-01', '0900'),
       travas: ['2026-12-01_0900', '2026-12-01_0930', '2026-12-01_1000'],
@@ -132,18 +132,6 @@ describe('Página pública (RF08, RF09)', () => {
       'Esse horário acabou de ser pedido por outra pessoa. Escolha outro.',
     );
     expect(screen.getByRole('heading', { name: 'Escolha o horário' })).toBeInTheDocument();
-  });
-
-  it('não envia sem a autorização', async () => {
-    vi.mocked(useOcupados).mockReturnValue({ dados: new Set(), carregando: false, erro: false });
-    await ateOsDados();
-    await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
-    await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
-    await userEvent.click(screen.getByRole('button', { name: 'Pedir horário' }));
-    expect(screen.getByLabelText(/Autorizo/)).toHaveAccessibleDescription(
-      'Marque a autorização para enviar o pedido.',
-    );
-    expect(reservar).not.toHaveBeenCalled();
   });
 
   it('RF14: página pausada mostra o aviso e não deixa pedir', () => {

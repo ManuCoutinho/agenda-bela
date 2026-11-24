@@ -28,13 +28,14 @@ describe('pedidos (RF09, RN02)', () => {
     expect(pedidoExpirado({ criadoEm }, new Date(AGORA.getTime() + VALIDADE_PEDIDO_MS))).toBe(true);
   });
 
-  it('normaliza o WhatsApp e exige a autorização', () => {
-    expect(
-      esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636', consentimento: true }),
-    ).toEqual({ nome: 'Ana', whatsapp: '5541988606636', consentimento: true });
-    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123', consentimento: false });
+  it('normaliza o WhatsApp e exige nome e número', () => {
+    expect(esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636' })).toEqual({
+      nome: 'Ana',
+      whatsapp: '5541988606636',
+    });
+    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123' });
     expect(r.success).toBe(false);
-    expect(r.error?.issues.map((i) => i.path[0])).toEqual(['nome', 'whatsapp', 'consentimento']);
+    expect(r.error?.issues.map((i) => i.path[0])).toEqual(['nome', 'whatsapp']);
   });
 
   it('mensagem do aviso no WhatsApp', () => {

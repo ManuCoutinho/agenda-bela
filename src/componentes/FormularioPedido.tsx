@@ -11,7 +11,7 @@ type Props = {
   erro?: string;
 };
 
-const VAZIO: CamposPedido = { nome: '', whatsapp: '', consentimento: false };
+const VAZIO: CamposPedido = { nome: '', whatsapp: '' };
 
 /** Dados da cliente na página pública (RF08). */
 export default function FormularioPedido({ aoEnviar, erro }: Props) {
@@ -56,26 +56,10 @@ export default function FormularioPedido({ aoEnviar, erro }: Props) {
         )}
       </Campo>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="consentimento" className="flex min-h-12 items-start gap-3">
-          <input
-            id="consentimento"
-            type="checkbox"
-            {...register('consentimento')}
-            aria-invalid={errors.consentimento ? true : undefined}
-            aria-describedby={errors.consentimento ? 'consentimento-erro' : undefined}
-            className="mt-0.5 size-6 shrink-0 accent-marca"
-          />
-          <span>
-            Autorizo guardar meu nome e WhatsApp para este agendamento e para os lembretes dele.
-          </span>
-        </label>
-        {errors.consentimento && (
-          <p id="consentimento-erro" className="text-erro">
-            {errors.consentimento.message}
-          </p>
-        )}
-      </div>
+      <p className="text-texto-suave">
+        Ao pedir o horário, seu nome e WhatsApp ficam guardados só para este agendamento e os
+        lembretes dele.
+      </p>
 
       {erro && (
         <p role="alert" className="text-erro">

@@ -107,6 +107,33 @@ export function observarOcupados(
 }
 
 /**
+ * I07: horas ocupadas por dia entre `de` e `ate` (AAAA-MM-DD, inclusive), numa
+ * só consulta. A página pública lê só o mês que está na tela.
+ */
+export function observarOcupadosNoPeriodo(
+  de: string,
+  ate: string,
+  aoMudar: (porDia: Map<string, Set<string>>) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(travas, where('data', '>=', de), where('data', '<=', ate)),
+    (snap) => {
+      const agora = new Date();
+      const porDia = new Map<string, Set<string>>();
+      for (const d of snap.docs) {
+        const t = d.data();
+        if (travaLivre(paraData(t.expiraEm), agora)) continue;
+        const dia = String(t.data);
+        porDia.set(dia, (porDia.get(dia) ?? new Set()).add(String(t.hora)));
+      }
+      aoMudar(porDia);
+    },
+    aoFalhar,
+  );
+}
+
+/**
  * Marca (sem `id`) ou altera um atendimento numa transação: confere as travas
  * novas, confirma-as (`expiraEm: null`) e libera as que deixaram de ser usadas.
  * Lança `HorarioOcupado` se outra trava ativa estiver no caminho. Precisa de

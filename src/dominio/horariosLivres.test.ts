@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diasAbertos, horariosLivres, type RegrasHorario } from './horariosLivres';
+import { diasAbertos, diasComHorario, horariosLivres, type RegrasHorario } from './horariosLivres';
 
 // terça, 09h–12h; a máquina dos testes pode estar em qualquer fuso
 const regras: RegrasHorario = {
@@ -86,5 +86,18 @@ describe('dias para pedir', () => {
   it('só os dias com expediente', () => {
     expect(diasAbertos({ ...regras, mesesAbertos: [202611] }, ANTES)).toEqual(['2026-11-24']);
     expect(diasAbertos(regras, ANTES).slice(0, 2)).toEqual(['2026-11-24', TERCA]);
+  });
+});
+
+describe('diasComHorario (I07)', () => {
+  it('some o dia cheio, o bloqueado e o que não cabe o serviço', () => {
+    const tercas = ['2026-11-24', '2026-12-01', '2026-12-08'];
+    const ocupadosPorDia = new Map([
+      ['2026-11-24', new Set(['0900', '1000', '1100'])], // cheio
+      ['2026-12-08', new Set(['1000'])], // sobra 09h e 11h: cabe 1 h, não cabe 2 h
+    ]);
+    const base = { dias: tercas, regras, ocupadosPorDia, agora: ANTES };
+    expect(diasComHorario({ ...base, duracaoMin: 60 })).toEqual(['2026-12-01', '2026-12-08']);
+    expect(diasComHorario({ ...base, duracaoMin: 120 })).toEqual(['2026-12-01']);
   });
 });

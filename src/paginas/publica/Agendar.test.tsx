@@ -5,14 +5,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { inicioEm } from '../../dominio/agenda';
 import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { HorarioJaPedido } from '../../dominio/pedidos';
-import { useOcupados } from '../../hooks/useAgenda';
+import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
 import { reservar } from '../../servicos/pedidos';
 import Agendar from './Agendar';
 
 vi.mock('../../hooks/usePaginaPublica', () => ({ usePaginaPublica: vi.fn() }));
-vi.mock('../../hooks/useAgenda', () => ({ useOcupados: vi.fn() }));
+vi.mock('../../hooks/useAgenda', () => ({ useOcupadosNoPeriodo: vi.fn() }));
+
+const ocupados = (porDia: Record<string, string[]> = {}) =>
+  vi.mocked(useOcupadosNoPeriodo).mockReturnValue({
+    dados: new Map(Object.entries(porDia).map(([dia, horas]) => [dia, new Set(horas)])),
+    carregando: false,
+    erro: false,
+  });
 vi.mock('../../servicos/pedidos', async () => {
   const { HorarioJaPedido: Ocupado } = await import('../../dominio/pedidos');
   return { reservar: vi.fn(), SemInternet: class extends Error {}, HorarioJaPedido: Ocupado };
@@ -51,6 +58,7 @@ function renderizar(rota = '/agendar/espaco-juju') {
 async function ateOsDados() {
   renderizar();
   await userEvent.click(screen.getByRole('button', { name: /Mão/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
   await userEvent.click(screen.getByRole('button', { name: 'terça-feira, 1 de dezembro' }));
   await userEvent.click(screen.getByRole('button', { name: '09:00' }));
 }
@@ -66,11 +74,7 @@ describe('Página pública (RF08, RF09)', () => {
     vi.useFakeTimers({ now: new Date('2026-11-20T12:00:00Z'), toFake: ['Date'] });
     vi.mocked(reservar).mockReset();
     vi.mocked(usePaginaPublica).mockReturnValue({ pagina: PAGINA, carregando: false, erro: false });
-    vi.mocked(useOcupados).mockReturnValue({
-      dados: new Set(['1000']),
-      carregando: false,
-      erro: false,
-    });
+    ocupados({ '2026-12-01': ['1000'] });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -103,21 +107,47 @@ describe('Página pública (RF08, RF09)', () => {
     expect(screen.queryByText('Teste interno')).not.toBeInTheDocument();
   });
 
-  it('só oferece dias com expediente e horários livres (com o intervalo)', async () => {
+  it('I07: calendário do mês com só os dias em que o serviço cabe', async () => {
     renderizar();
     await userEvent.click(screen.getByRole('button', { name: /Mão/ }));
-    const dias = screen.getAllByRole('button', { name: /feira|sábado|domingo/ });
-    expect(dias.map((d) => d.textContent).slice(0, 2)).toEqual([
-      'ter24 novterça-feira, 24 de novembro',
-      'ter1 dezterça-feira, 1 de dezembro',
-    ]);
-    await userEvent.click(screen.getByRole('button', { name: 'terça-feira, 1 de dezembro' }));
-    // 09:00 + 1 h + 30 min de intervalo invade as 10:00 ocupadas
-    expect(screen.getByText('Nenhum horário livre neste dia.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Novembro/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'terça-feira, 24 de novembro' })).toBeEnabled();
+    // sem expediente na quarta
+    expect(
+      screen.getByRole('button', { name: 'quarta-feira, 25 de novembro, sem horário' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Mês anterior' })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
+    // 09:00 + 1 h + 30 min de intervalo invade as 10:00 ocupadas; 10:00 está ocupada
+    expect(
+      screen.getByRole('button', { name: 'terça-feira, 1 de dezembro, sem horário' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Próximo mês' })).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole('button', { name: /Próximo dia com horário: terça-feira, 8 de dezembro/ }),
+    );
+    expect(screen.getByRole('heading', { name: 'Escolha o horário' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '09:00' })).toBeInTheDocument();
+  });
+
+  it('I07: lê só as travas do mês na tela', async () => {
+    renderizar();
+    await userEvent.click(screen.getByRole('button', { name: /Mão/ }));
+    expect(useOcupadosNoPeriodo).toHaveBeenLastCalledWith('2026-11-24', '2026-11-24'); // só terças
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
+    expect(useOcupadosNoPeriodo).toHaveBeenLastCalledWith('2026-12-01', '2026-12-29');
+  });
+
+  it('I07: mês sem nenhum horário abre direto o seguinte', async () => {
+    ocupados({ '2026-11-24': ['0900', '1000'] });
+    renderizar();
+    await userEvent.click(screen.getByRole('button', { name: /Mão/ }));
+    expect(await screen.findByRole('heading', { name: /Dezembro/ })).toBeInTheDocument();
   });
 
   it('pede o horário com as travas do serviço e oferece avisar no WhatsApp', async () => {
-    vi.mocked(useOcupados).mockReturnValue({ dados: new Set(), carregando: false, erro: false });
+    ocupados();
     vi.mocked(reservar).mockResolvedValue();
     await ateOsDados();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
@@ -139,7 +169,7 @@ describe('Página pública (RF08, RF09)', () => {
   });
 
   it('se outra pessoa pediu antes, volta para os horários com o aviso', async () => {
-    vi.mocked(useOcupados).mockReturnValue({ dados: new Set(), carregando: false, erro: false });
+    ocupados();
     vi.mocked(reservar).mockRejectedValue(new HorarioJaPedido());
     await ateOsDados();
     await preencher();

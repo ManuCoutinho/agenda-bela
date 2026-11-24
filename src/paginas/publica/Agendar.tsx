@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router';
 import BarraSuperior from '../../componentes/BarraSuperior';
 import Botao from '../../componentes/Botao';
+import Calendario from '../../componentes/Calendario';
 import FormularioPedido from '../../componentes/FormularioPedido';
 import Icone from '../../componentes/Icone';
 import Carregando from '../../componentes/Carregando';
@@ -12,13 +13,19 @@ import {
   ESTILO_ITEM_LISTA,
   ESTILO_LISTA,
 } from '../../componentes/estilos';
-import { idsTravas, inicioEm, rotuloDia, rotuloDiaCurto, rotuloHora } from '../../dominio/agenda';
+import { dataDoDia, idsTravas, inicioEm, rotuloDia, rotuloHora } from '../../dominio/agenda';
+import { tituloDoMes, type MarcasDoDia } from '../../dominio/calendario';
 import { linkInstagram } from '../../dominio/configuracoes';
-import { diasAbertos, type RegrasHorario } from '../../dominio/horariosLivres';
+import {
+  diasAbertos,
+  diasComHorario,
+  horariosLivres,
+  type RegrasHorario,
+} from '../../dominio/horariosLivres';
 import { HorarioJaPedido, textoAvisoPedido, type DadosPedido } from '../../dominio/pedidos';
 import { formatarDuracao, formatarPreco, type Servico } from '../../dominio/servicos';
 import { linkWhatsApp } from '../../dominio/whatsapp';
-import { useHorariosLivres } from '../../hooks/useHorariosLivres';
+import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
 import { reservar, SemInternet } from '../../servicos/pedidos';
@@ -26,6 +33,8 @@ import PaginaNaoEncontrada from '../PaginaNaoEncontrada';
 
 const ESTILO_CHIP =
   'flex min-h-12 flex-col items-center justify-center rounded-lg border border-borda-campo bg-superficie px-2 py-2 text-texto hover:bg-marca-suave active:bg-marca-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca';
+
+const SEM_MARCAS: ReadonlyMap<string, MarcasDoDia> = new Map();
 
 const quando = (dia: string, hora: string) => `${rotuloDia(dia)}, às ${rotuloHora(hora)}`;
 
@@ -67,11 +76,51 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   };
   const servicos = pagina.servicos.filter((s) => s.publico);
   const servico = servicos.find((s) => s.id === busca.get('servico'));
-  const dias = diasAbertos(regras, new Date());
+  const agora = new Date();
+  const dias = diasAbertos(regras, agora);
   const diaPedido = busca.get('dia') ?? '';
   const dia = servico && dias.includes(diaPedido) ? diaPedido : undefined;
   const hora = dia ? (busca.get('hora') ?? undefined) : undefined;
-  const { horarios, carregando, erro } = useHorariosLivres(dia ?? '', servico?.duracaoMin, regras);
+
+  // I07: o calendário mostra um mês por vez e lê só as travas desse mês
+  const meses = [...new Set(dias.map((d) => d.slice(0, 7)))];
+  const mesPedido = busca.get('mes') ?? '';
+  const mes = dia ? dia.slice(0, 7) : meses.includes(mesPedido) ? mesPedido : meses[0];
+  const diasDoMes = mes ? dias.filter((d) => d.startsWith(mes)) : [];
+  const ocupados = useOcupadosNoPeriodo(
+    servico ? (diasDoMes[0] ?? '') : '',
+    servico ? (diasDoMes.at(-1) ?? '') : '',
+  );
+  const { carregando, erro } = ocupados;
+  const livres =
+    servico && !carregando
+      ? diasComHorario({
+          dias: diasDoMes,
+          duracaoMin: servico.duracaoMin,
+          regras,
+          ocupadosPorDia: ocupados.dados,
+          agora,
+        })
+      : [];
+  const horarios =
+    servico && dia
+      ? horariosLivres({
+          data: dia,
+          duracaoMin: servico.duracaoMin,
+          regras,
+          ocupados: ocupados.dados.get(dia) ?? new Set<string>(),
+          agora,
+        })
+      : [];
+  const proximoMes = mes ? meses[meses.indexOf(mes) + 1] : undefined;
+  const mesSemHorario = Boolean(servico && !dia && !carregando && !erro && livres.length === 0);
+
+  // mês inteiro sem horário: abre o seguinte, se ela não escolheu o mês
+  useEffect(() => {
+    if (mesSemHorario && !mesPedido && servico && proximoMes) {
+      setBusca({ servico: servico.id, mes: proximoMes }, { replace: true });
+    }
+  }, [mesSemHorario, mesPedido, servico, proximoMes, setBusca]);
 
   const titulo = config.nome || 'Agendar horário';
   const base = { titulo, instagram: config.instagram };
@@ -177,38 +226,87 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   }
 
   const voltarServico = pathname;
-  const voltarDia = `${pathname}?servico=${servico.id}`;
+  const voltarDia = `${pathname}?servico=${servico.id}&mes=${mes ?? ''}`;
 
   if (!dia) {
+    const indice = mes ? meses.indexOf(mes) : -1;
+    const irParaMes = (passo: 1 | -1) => {
+      const outro = meses[indice + passo];
+      if (outro) ir({ servico: servico.id, mes: outro });
+    };
+    const titulos = mes ? tituloDoMes(`${mes}-01`) : null;
+    const primeiroLivre = livres[0];
     return (
       <Moldura {...base} voltarPara={voltarServico}>
         <Passo numero={2} titulo="Escolha o dia" />
         <Escolhas servico={servico} />
-        {dias.length === 0 ? (
+        {!mes || !titulos ? (
           <p className="text-texto-suave">Não há dias abertos para agendar agora.</p>
         ) : (
-          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {dias.map((d) => {
-              const curto = rotuloDiaCurto(d);
-              return (
-                <li key={d}>
-                  <button
-                    type="button"
-                    className={`${ESTILO_CHIP} w-full`}
-                    onClick={() => ir({ servico: servico.id, dia: d })}
-                  >
-                    <span aria-hidden="true" className="text-texto-suave">
-                      {curto.semana}
-                    </span>
-                    <span aria-hidden="true" className="font-medium">
-                      {curto.dia}
-                    </span>
-                    <span className="sr-only">{rotuloDia(d)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <nav aria-label="Trocar mês" className="mb-2 flex items-center gap-1">
+              <h3 aria-live="polite" className="flex flex-1 flex-col-reverse">
+                <span className="text-3xl font-semibold">{titulos.mes}</span>{' '}
+                <span className="text-base text-texto-suave">{titulos.ano}</span>
+              </h3>
+              <button
+                type="button"
+                aria-label="Mês anterior"
+                disabled={indice <= 0}
+                onClick={() => irParaMes(-1)}
+                className={`${ESTILO_BOTAO_ICONE} disabled:opacity-40`}
+              >
+                <Icone nome="anterior" />
+              </button>
+              <button
+                type="button"
+                aria-label="Próximo mês"
+                disabled={!proximoMes}
+                onClick={() => irParaMes(1)}
+                className={`${ESTILO_BOTAO_ICONE} disabled:opacity-40`}
+              >
+                <Icone nome="proximo" />
+              </button>
+            </nav>
+            {erro && (
+              <p role="alert" className="mb-2 text-erro">
+                Não foi possível ver os horários. Confira a internet e tente de novo.
+              </p>
+            )}
+            <Calendario
+              dia={`${mes}-01`}
+              hoje={dataDoDia(agora)}
+              marcas={SEM_MARCAS}
+              habilitados={new Set(livres)}
+              semSelecao
+              aoEscolherDia={(d) => ir({ servico: servico.id, dia: d })}
+              aoTrocarMes={irParaMes}
+            />
+            <div className="mt-4">
+              {carregando ? (
+                <p role="status" className="text-texto-suave">
+                  Procurando dias com horário…
+                </p>
+              ) : primeiroLivre ? (
+                <Botao
+                  variante="secundario"
+                  className="w-full"
+                  onClick={() => ir({ servico: servico.id, dia: primeiroLivre })}
+                >
+                  <span className="first-letter:uppercase">
+                    Próximo dia com horário: {rotuloDia(primeiroLivre)}
+                  </span>
+                </Botao>
+              ) : (
+                !erro && (
+                  <p className="text-texto-suave">
+                    Nenhum dia com horário neste mês
+                    {proximoMes ? '. Veja o próximo mês.' : '.'}
+                  </p>
+                )
+              )}
+            </div>
+          </>
         )}
       </Moldura>
     );
@@ -238,7 +336,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
             <button
               type="button"
               className="underline underline-offset-4 text-marca"
-              onClick={() => ir({ servico: servico.id })}
+              onClick={() => ir({ servico: servico.id, mes: mes ?? '' })}
             >
               Escolher outro dia
             </button>

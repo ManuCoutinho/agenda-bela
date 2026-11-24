@@ -12,6 +12,10 @@ type Props = {
   aoEscolherDia: (dia: string) => void;
   /** Deslizar para o lado: -1 mês anterior, 1 próximo. */
   aoTrocarMes: (passo: 1 | -1) => void;
+  /** Só estes dias (AAAA-MM-DD) podem ser tocados; os outros ficam apagados. */
+  habilitados?: ReadonlySet<string>;
+  /** Mostra o mês sem destacar o `dia` (página pública, antes de escolher). */
+  semSelecao?: boolean;
 };
 
 const ContextoMarcas = createContext<ReadonlyMap<string, MarcasDoDia>>(new Map());
@@ -20,9 +24,15 @@ const DESLIZE_MIN_PX = 50;
 
 const plural = (n: number, palavra: string) => `${n} ${palavra}${n > 1 ? 's' : ''}`;
 
-function rotuloDoDia(data: Date, marcas: MarcasDoDia | undefined, hoje: boolean) {
+function rotuloDoDia(
+  data: Date,
+  marcas: MarcasDoDia | undefined,
+  hoje: boolean,
+  desativado: boolean,
+) {
   const partes = [format(data, "EEEE, d 'de' MMMM", { locale: ptBR })];
   if (hoje) partes.push('hoje');
+  if (desativado) partes.push('sem horário');
   if (marcas?.atendimentos) partes.push(plural(marcas.atendimentos, 'atendimento'));
   if (marcas?.bloqueios) partes.push(plural(marcas.bloqueios, 'bloqueio'));
   return partes.join(', ');
@@ -36,17 +46,19 @@ function BotaoDia({ day, modifiers, className, ...props }: DayButtonProps) {
     if (modifiers.focused) ref.current?.focus();
   }, [modifiers.focused]);
 
-  const numero = modifiers.selected
-    ? 'bg-marca font-semibold text-superficie'
-    : modifiers.today
-      ? 'font-semibold text-marca ring-2 ring-marca'
-      : 'group-hover:bg-marca-suave';
+  const numero = modifiers.disabled
+    ? 'text-texto-suave line-through decoration-1'
+    : modifiers.selected
+      ? 'bg-marca font-semibold text-superficie'
+      : modifiers.today
+        ? 'font-semibold text-marca ring-2 ring-marca'
+        : 'group-hover:bg-marca-suave';
 
   return (
     <button
       ref={ref}
       {...props}
-      aria-label={rotuloDoDia(day.date, marcas, modifiers.today)}
+      aria-label={rotuloDoDia(day.date, marcas, modifiers.today, modifiers.disabled)}
       className={`group flex h-14 w-full flex-col items-center justify-start gap-1 pt-1 text-texto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marca ${className ?? ''}`}
     >
       <span
@@ -67,7 +79,15 @@ function BotaoDia({ day, modifiers, className, ...props }: DayButtonProps) {
  * shadcn/ui (react-day-picker) com os tokens do tema. Mês e navegação ficam na
  * tela; aqui só a grade, que também troca de mês ao deslizar.
  */
-export default function Calendario({ dia, hoje, marcas, aoEscolherDia, aoTrocarMes }: Props) {
+export default function Calendario({
+  dia,
+  hoje,
+  marcas,
+  aoEscolherDia,
+  aoTrocarMes,
+  habilitados,
+  semSelecao = false,
+}: Props) {
   const toque = useRef<{ x: number; y: number } | null>(null);
 
   function aoComecar(e: TouchEvent) {
@@ -96,7 +116,8 @@ export default function Calendario({ dia, hoje, marcas, aoEscolherDia, aoTrocarM
           locale={ptBR}
           month={paraDataLocal(dia)}
           today={paraDataLocal(hoje)}
-          selected={paraDataLocal(dia)}
+          selected={semSelecao ? undefined : paraDataLocal(dia)}
+          disabled={habilitados ? (d: Date) => !habilitados.has(deDataLocal(d)) : undefined}
           onSelect={(d) => aoEscolherDia(deDataLocal(d))}
           onMonthChange={(m) => aoTrocarMes(m > paraDataLocal(dia) ? 1 : -1)}
           hideNavigation

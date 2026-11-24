@@ -71,3 +71,24 @@ export function horariosLivres(p: {
   }
   return livres;
 }
+
+const NENHUMA_HORA: ReadonlySet<string> = new Set();
+
+/** I07: dos `dias`, os que têm ao menos um horário em que o serviço cabe. */
+export const diasComHorario = (p: {
+  dias: readonly string[];
+  duracaoMin: number;
+  regras: RegrasHorario;
+  ocupadosPorDia: ReadonlyMap<string, ReadonlySet<string>>;
+  agora: Date;
+}) =>
+  p.dias.filter(
+    (data) =>
+      horariosLivres({
+        data,
+        duracaoMin: p.duracaoMin,
+        regras: p.regras,
+        ocupados: p.ocupadosPorDia.get(data) ?? NENHUMA_HORA,
+        agora: p.agora,
+      }).length > 0,
+  );

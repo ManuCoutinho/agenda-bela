@@ -67,8 +67,12 @@ service cloud.firestore {
         && mesAberto(request.resource.data.inicio)
         && request.resource.data.keys().hasOnly(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas',
-           'serieId'])
+           'serieId', 'chave'])
         && daSerie(request.resource.data)
+        // I13: chave pessoal do aparelho da cliente (para "Meus horários")
+        && (!('chave' in request.resource.data)
+          || (request.resource.data.chave is string
+            && request.resource.data.chave.matches('^[A-Za-z0-9]{20,40}$')))
         && request.resource.data.keys().hasAll(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
         && request.resource.data.nome is string
@@ -100,6 +104,14 @@ service cloud.firestore {
         && travaNaPosicao(request.resource.data.travas, 9)
         && travaNaPosicao(request.resource.data.travas, 10)
         && travaNaPosicao(request.resource.data.travas, 11);
+    }
+
+    // I13: "Meus horários" – cópia resumida dos horários da cliente, gravada pela dona.
+    // Só quem tem a chave (id aleatório guardado no celular dela) lê; ninguém lista.
+    match /portal/{chave} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isOwner();
     }
 
     // I11: horário fixo pedido pela cliente; a dona lê, encerra e apaga

@@ -37,6 +37,21 @@ import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
 import { reservar, reservarSerie, SemInternet, type FalhaSerie } from '../../servicos/pedidos';
 import { datasDaSerie } from '../../dominio/series';
+import MeusHorarios from '../../componentes/MeusHorarios';
+import Campo from '../../componentes/Campo';
+import { ESTILO_CAMPO } from '../../componentes/estilos';
+import { formatarWhatsApp, normalizarWhatsApp } from '../../dominio/clientes';
+import { juntarHorarios } from '../../dominio/portal';
+import { usePortal } from '../../hooks/usePortal';
+import {
+  chaveParaMarcar,
+  esquecerCliente,
+  guardarHorariosLocais,
+  guardarWhatsApp,
+  lerClienteDoAparelho,
+  lerHorariosLocais,
+  type ClienteDoAparelho,
+} from '../../servicos/aparelho';
 import PaginaNaoEncontrada from '../PaginaNaoEncontrada';
 
 const ESTILO_CHIP =
@@ -90,6 +105,20 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   const [aviso, setAviso] = useState<string>();
   const [erroEnvio, setErroEnvio] = useState<string>();
   const [enviado, setEnviado] = useState<Enviado>();
+  // I13: o que este celular lembra da cliente (WhatsApp, nome e chave de "Meus horários")
+  const [aparelho, setAparelho] = useState<ClienteDoAparelho | null>(lerClienteDoAparelho);
+  const portal = usePortal(aparelho?.chave);
+  const meusHorarios = juntarHorarios(
+    portal.portal?.horarios ?? [],
+    lerHorariosLocais().map((h) => ({
+      id: `local-${h.inicio}`,
+      inicio: new Date(h.inicio),
+      servico: h.servico,
+      duracaoMin: h.duracaoMin,
+      travas: [],
+    })),
+    new Date(),
+  );
 
   const regras: RegrasHorario = {
     ...config,
@@ -155,6 +184,16 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   async function pedir(dados: DadosPedido) {
     if (!servico || !dia || !hora) return;
     setErroEnvio(undefined);
+    const chave = chaveParaMarcar(dados.nome, dados.whatsapp);
+    setAparelho(lerClienteDoAparelho());
+    const lembrar = (dias: string[]) =>
+      guardarHorariosLocais(
+        dias.map((d) => ({
+          inicio: inicioEm(d, hora).toISOString(),
+          servico: servico.nome,
+          duracaoMin: servico.duracaoMin,
+        })),
+      );
     const travasDe = (d: string) =>
       idsTravas(inicioEm(d, hora), servico.duracaoMin, config.intervaloMin);
     try {
@@ -167,8 +206,10 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
           frequenciaDias: dados.repetir,
           datas: datasDaSerie(dia, dados.repetir, regras.mesesAbertos, new Date()),
           travasDe,
+          chave,
         });
         if (r.reservadas.length === 0) throw new HorarioJaPedido();
+        lembrar(r.reservadas);
         setEnviado({ nome: dados.nome, servico, hora, dias: r.reservadas, falhas: r.falhas });
         return;
       }
@@ -178,7 +219,9 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
         servicoId: servico.id,
         inicio: inicioEm(dia, hora),
         travas: travasDe(dia),
+        chave,
       });
+      lembrar([dia]);
       setEnviado({ nome: dados.nome, servico, hora, dias: [dia], falhas: [] });
     } catch (e) {
       if (e instanceof HorarioJaPedido) {
@@ -236,8 +279,38 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   }
 
   if (!servico) {
+    if (!aparelho) {
+      return (
+        <Moldura {...base} endereco={config.endereco}>
+          <PerguntaWhatsApp aoContinuar={(numero) => setAparelho(guardarWhatsApp(numero))} />
+        </Moldura>
+      );
+    }
     return (
       <Moldura {...base} endereco={config.endereco}>
+        <MeusHorarios
+          horarios={meusHorarios}
+          carregando={portal.carregando}
+          semChave={!aparelho.chave}
+          falarNoWhatsApp={
+            config.whatsapp
+              ? linkWhatsApp(config.whatsapp, 'Oi! Quero remarcar/cancelar meu horário. ')
+              : undefined
+          }
+        />
+        <p className="mb-4 text-texto-suave">
+          WhatsApp {formatarWhatsApp(aparelho.whatsapp)}.{' '}
+          <button
+            type="button"
+            className="min-h-12 text-marca underline underline-offset-4"
+            onClick={() => {
+              esquecerCliente();
+              setAparelho(null);
+            }}
+          >
+            Não é você? Trocar número
+          </button>
+        </p>
         <Passo numero={1} titulo="Escolha o serviço" />
         {servicos.length === 0 ? (
           <p className="text-texto-suave">
@@ -412,6 +485,11 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
             aoEnviar={pedir}
             erro={erroEnvio}
             datasDaRepeticao={(r) => datasDaSerie(dia, r, regras.mesesAbertos, agora)}
+            inicial={
+              aparelho
+                ? { nome: aparelho.nome, whatsapp: formatarWhatsApp(aparelho.whatsapp) }
+                : undefined
+            }
           />
         </>
       ) : (
@@ -631,5 +709,45 @@ function Confirmacao({
         </Botao>
       </div>
     </section>
+  );
+}
+
+/** I13: o fluxo começa pelo WhatsApp, que preenche os dados no fim e mostra "Meus horários". */
+function PerguntaWhatsApp({ aoContinuar }: { aoContinuar: (whatsapp: string) => void }) {
+  const [texto, setTexto] = useState('');
+  const [erro, setErro] = useState<string>();
+  return (
+    <form
+      noValidate
+      className="flex flex-col gap-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const numero = normalizarWhatsApp(texto);
+        if (!numero) {
+          setErro('Escreva o seu WhatsApp com DDD, por exemplo (41) 98860-6636.');
+          return;
+        }
+        aoContinuar(numero);
+      }}
+    >
+      <h2 className="text-secao font-medium">Qual o seu WhatsApp?</h2>
+      <p className="text-texto-suave">
+        Com ele você vê os horários que já marcou por este celular e não precisa digitar de novo.
+      </p>
+      <Campo id="whatsapp-inicio" rotulo="Seu WhatsApp com DDD" erro={erro}>
+        {(a) => (
+          <input
+            {...a}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            className={ESTILO_CAMPO}
+          />
+        )}
+      </Campo>
+      <Botao type="submit">Continuar</Botao>
+    </form>
   );
 }

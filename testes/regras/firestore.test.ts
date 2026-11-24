@@ -412,3 +412,23 @@ describe('horário fixo (I11)', () => {
     await lote.commit();
   }
 });
+
+describe('"Meus horários" (I13)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+
+  it('quem tem a chave lê o portal; ninguém lista; só a manicure grava', async () => {
+    await manicure().doc(`portal/${CHAVE}`).set({ whatsapp: '5511987654321', horarios: {} });
+    await assertSucceeds(visitante().doc(`portal/${CHAVE}`).get());
+    await assertFails(visitante().collection('portal').get());
+    await assertFails(visitante().doc(`portal/${CHAVE}`).set({ horarios: {} }));
+    await assertFails(visitante().doc('portal/outra-chave-qualquer-aaa').set({ horarios: {} }));
+  });
+
+  it('pedido leva a chave do aparelho; chave fora do formato é recusada', async () => {
+    const ids = ['2026-12-01_0900'];
+    await assertSucceeds(reservar(ids, pedido(ids, { chave: CHAVE })));
+    const outras = ['2026-12-02_0900'];
+    await assertFails(reservar(outras, pedido(outras, { chave: 'curta' })));
+    await assertFails(reservar(outras, pedido(outras, { chave: `${CHAVE}/../x` })));
+  });
+});

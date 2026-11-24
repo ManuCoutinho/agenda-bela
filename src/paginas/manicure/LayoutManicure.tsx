@@ -5,6 +5,7 @@ import { ESTILO_FOLHA } from '../../componentes/estilos';
 import { useAuth } from '../../hooks/useAuth';
 import { useConversaoPedidos } from '../../hooks/useConversaoPedidos';
 import { useMigracoes } from '../../hooks/useMigracoes';
+import { useSincronizarPortais } from '../../hooks/useSincronizarPortais';
 import AcessoNegado from '../AcessoNegado';
 
 export default function LayoutManicure() {
@@ -32,5 +33,6 @@ export default function LayoutManicure() {
 function Migracoes() {
   useMigracoes();
   useConversaoPedidos();
+  useSincronizarPortais();
   return null;
 }

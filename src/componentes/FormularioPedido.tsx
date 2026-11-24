@@ -13,12 +13,14 @@ type Props = {
   erro?: string;
   /** I11: datas (AAAA-MM-DD) que o horário fixo reservaria, para a cliente conferir. */
   datasDaRepeticao: (dias: Repeticao) => string[];
+  /** I13: nome e WhatsApp que o aparelho já conhece. */
+  inicial?: { nome: string; whatsapp: string };
 };
 
 const VAZIO: CamposPedido = { nome: '', whatsapp: '', repetir: '0' };
 
 /** Dados da cliente na página pública (RF08) e, se quiser, o horário fixo (I11). */
-export default function FormularioPedido({ aoEnviar, erro, datasDaRepeticao }: Props) {
+export default function FormularioPedido({ aoEnviar, erro, datasDaRepeticao, inicial }: Props) {
   const {
     register,
     handleSubmit,
@@ -26,7 +28,7 @@ export default function FormularioPedido({ aoEnviar, erro, datasDaRepeticao }: P
     formState: { errors, isSubmitting },
   } = useForm<CamposPedido, unknown, DadosPedido>({
     resolver: zodResolver(esquemaPedido),
-    defaultValues: VAZIO,
+    defaultValues: { ...VAZIO, ...inicial },
   });
   const repetir = Number(useWatch({ control, name: 'repetir' })) as Repeticao;
   const datas = repetir ? datasDaRepeticao(repetir) : [];

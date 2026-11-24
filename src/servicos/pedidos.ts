@@ -1,5 +1,6 @@
 import { FirebaseError } from 'firebase/app';
 import {
+  arrayUnion,
   collection,
   deleteField,
   doc,
@@ -53,6 +54,8 @@ type DadosReserva = Pick<DadosPedido, 'nome' | 'whatsapp'> & {
   servicoId: string;
   inicio: Date;
   travas: string[];
+  /** I13: chave do aparelho, para "Meus horários". */
+  chave?: string;
 };
 
 export async function reservar(dados: DadosReserva): Promise<void> {
@@ -82,6 +85,7 @@ function incluirReserva(
     status: 'confirmado',
     criadoEm: serverTimestamp(),
     travas: dados.travas,
+    ...(dados.chave ? { chave: dados.chave } : {}),
     ...extra,
   });
 }
@@ -128,6 +132,7 @@ const paraPedido = (id: string, d: DocumentData): Pedido => ({
   criadoEm: paraData(d.criadoEm) ?? new Date(),
   serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
   semAviso: d.semAviso === true ? true : undefined,
+  chave: typeof d.chave === 'string' ? d.chave : undefined,
 });
 
 function observarPorStatus(
@@ -298,12 +303,16 @@ export async function aprovarPedido(
     }
 
     const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes);
+    if (clienteId && pedido.chave) {
+      tx.update(cliente, { chaves: arrayUnion(pedido.chave) });
+    }
     if (!clienteId) {
       tx.set(cliente, {
         nome: pedido.nome,
         whatsapp: pedido.whatsapp,
         observacao: '',
         consentimento: true,
+        ...(pedido.chave ? { chaves: [pedido.chave] } : {}),
         criadoEm: serverTimestamp(),
         atualizadoEm: serverTimestamp(),
       });
@@ -373,6 +382,7 @@ export async function reservarSerie(
     frequenciaDias: number;
     datas: readonly string[];
     travasDe: (data: string) => string[];
+    chave?: string;
   },
 ): Promise<{ reservadas: string[]; falhas: FalhaSerie[] }> {
   if (!navigator.onLine) throw new SemInternet();
@@ -402,6 +412,7 @@ export async function reservarSerie(
         servicoId: dados.servicoId,
         inicio: inicioEm(data, dados.hora),
         travas: dados.travasDe(data),
+        chave: dados.chave,
       },
       { serieId: serie.id },
     );

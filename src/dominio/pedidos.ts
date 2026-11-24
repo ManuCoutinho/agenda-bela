@@ -28,6 +28,8 @@ export type Pedido = {
   serieId?: string;
   /** I11: reservado pela dona ao abrir o mês (a cliente já sabe): sem aviso na fila. */
   semAviso?: boolean;
+  /** I13: chave do aparelho em que a cliente marcou. */
+  chave?: string;
 };
 
 export type TipoAviso = 'confirmacao' | 'troca' | 'recusa';

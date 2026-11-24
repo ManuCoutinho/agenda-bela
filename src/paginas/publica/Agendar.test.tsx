@@ -7,11 +7,13 @@ import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
 import { HorarioJaPedido } from '../../dominio/pedidos';
 import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
+import { usePortal } from '../../hooks/usePortal';
 import type { PaginaPublica } from '../../servicos/configPublica';
 import { reservar, reservarSerie } from '../../servicos/pedidos';
 import Agendar from './Agendar';
 
 vi.mock('../../hooks/usePaginaPublica', () => ({ usePaginaPublica: vi.fn() }));
+vi.mock('../../hooks/usePortal', () => ({ usePortal: vi.fn() }));
 vi.mock('../../hooks/useAgenda', () => ({ useOcupadosNoPeriodo: vi.fn() }));
 
 const ocupados = (porDia: Record<string, string[]> = {}) =>
@@ -69,7 +71,9 @@ async function ateOsDados() {
 }
 
 async function preencher() {
+  await userEvent.clear(screen.getByLabelText('Seu nome'));
   await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
+  await userEvent.clear(screen.getByLabelText('Seu WhatsApp com DDD'));
   await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
   await userEvent.click(screen.getByRole('button', { name: 'Marcar horário' }));
 }
@@ -77,6 +81,13 @@ async function preencher() {
 describe('Página pública (RF08, RF09)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date('2026-11-20T12:00:00Z'), toFake: ['Date'] });
+    localStorage.clear();
+    // este celular já informou o WhatsApp (o passo da pergunta tem teste próprio)
+    localStorage.setItem(
+      'agenda-bela:cliente',
+      JSON.stringify({ nome: '', whatsapp: '5541988606636' }),
+    );
+    vi.mocked(usePortal).mockReturnValue({ portal: null, carregando: false, erro: false });
     vi.mocked(reservar).mockReset();
     vi.mocked(usePaginaPublica).mockReturnValue({ pagina: PAGINA, carregando: false, erro: false });
     ocupados({ '2026-12-01': ['1000'] });
@@ -164,6 +175,7 @@ describe('Página pública (RF08, RF09)', () => {
       whatsapp: '5541988606636',
       servicoId: 's1',
       inicio: inicioEm('2026-12-01', '0900'),
+      chave: expect.stringMatching(/^[A-Za-z0-9]{24}$/),
       travas: ['2026-12-01_0900', '2026-12-01_1000'], // 1 h + 30 min de intervalo = 2 h
     });
     expect(await screen.findByRole('heading', { name: 'Horário marcado!' })).toBeInTheDocument();
@@ -202,9 +214,7 @@ describe('Página pública (RF08, RF09)', () => {
     await ateOsDados();
     await userEvent.selectOptions(screen.getByLabelText('Repetir este horário'), 'Toda semana');
     expect(screen.getByText('Vamos reservar 5 datas:')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
-    await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar horário' }));
+    await preencher();
 
     expect(reservarSerie).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -224,6 +234,55 @@ describe('Página pública (RF08, RF09)', () => {
     expect(screen.getByText(/15 de dezembro, às 09:00: já estava ocupado/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Todas as datas/ })).toBeInTheDocument();
     expect(reservar).not.toHaveBeenCalled();
+  });
+
+  it('I13: começa pelo WhatsApp e mostra os horários deste celular', async () => {
+    localStorage.clear();
+    renderizar();
+    expect(screen.getByRole('heading', { name: 'Qual o seu WhatsApp?' })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '123');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByLabelText('Seu WhatsApp com DDD')).toHaveAccessibleDescription(
+      /Escreva o seu WhatsApp com DDD/,
+    );
+    await userEvent.clear(screen.getByLabelText('Seu WhatsApp com DDD'));
+    await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.getByRole('heading', { name: 'Meus horários' })).toBeInTheDocument();
+    expect(screen.getByText(/Os horários que você marcar por este celular/)).toBeInTheDocument();
+    expect(usePortal).toHaveBeenLastCalledWith(undefined); // sem chave, não lê nada
+    expect(screen.getByRole('button', { name: /Mão/ })).toBeInTheDocument();
+  });
+
+  it('I13: com a chave do celular, lista os horários e preenche os dados', async () => {
+    localStorage.setItem(
+      'agenda-bela:cliente',
+      JSON.stringify({ nome: 'Ana', whatsapp: '5541988606636', chave: 'k'.repeat(24) }),
+    );
+    vi.mocked(usePortal).mockReturnValue({
+      portal: {
+        nome: 'Ana',
+        whatsapp: '5541988606636',
+        horarios: [
+          {
+            id: 'a1',
+            inicio: inicioEm('2026-12-08', '0900'),
+            servico: 'Mão',
+            duracaoMin: 60,
+            travas: ['2026-12-08_0900'],
+          },
+        ],
+      },
+      carregando: false,
+      erro: false,
+    });
+    ocupados();
+    await ateOsDados();
+    expect(usePortal).toHaveBeenCalledWith('k'.repeat(24));
+    expect(screen.getByLabelText('Seu nome')).toHaveValue('Ana');
+    expect(screen.getByLabelText('Seu WhatsApp com DDD')).toHaveValue('(41) 98860-6636');
+    renderizar();
+    expect(screen.getAllByText('terça-feira, 8 de dezembro, às 09:00').length).toBeGreaterThan(0);
   });
 
   it('RF14: página pausada mostra o aviso e não deixa pedir', () => {

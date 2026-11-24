@@ -8,7 +8,7 @@ import { HorarioJaPedido } from '../../dominio/pedidos';
 import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
-import { reservar } from '../../servicos/pedidos';
+import { reservar, reservarSerie } from '../../servicos/pedidos';
 import Agendar from './Agendar';
 
 vi.mock('../../hooks/usePaginaPublica', () => ({ usePaginaPublica: vi.fn() }));
@@ -22,7 +22,12 @@ const ocupados = (porDia: Record<string, string[]> = {}) =>
   });
 vi.mock('../../servicos/pedidos', async () => {
   const { HorarioJaPedido: Ocupado } = await import('../../dominio/pedidos');
-  return { reservar: vi.fn(), SemInternet: class extends Error {}, HorarioJaPedido: Ocupado };
+  return {
+    reservar: vi.fn(),
+    reservarSerie: vi.fn(),
+    SemInternet: class extends Error {},
+    HorarioJaPedido: Ocupado,
+  };
 });
 
 const PAGINA: PaginaPublica = {
@@ -186,6 +191,39 @@ describe('Página pública (RF08, RF09)', () => {
       'Esse horário acabou de ser marcado por outra pessoa. Escolha outro.',
     );
     expect(screen.getByRole('heading', { name: 'Escolha o horário' })).toBeInTheDocument();
+  });
+
+  it('I11: horário fixo reserva as datas dos meses abertos e mostra a que não deu', async () => {
+    ocupados();
+    vi.mocked(reservarSerie).mockResolvedValue({
+      reservadas: ['2026-12-01', '2026-12-08', '2026-12-22', '2026-12-29'],
+      falhas: [{ data: '2026-12-15', motivo: 'ocupado' }],
+    });
+    await ateOsDados();
+    await userEvent.selectOptions(screen.getByLabelText('Repetir este horário'), 'Toda semana');
+    expect(screen.getByText('Vamos reservar 5 datas:')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Seu nome'), 'Ana');
+    await userEvent.type(screen.getByLabelText('Seu WhatsApp com DDD'), '41988606636');
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar horário' }));
+
+    expect(reservarSerie).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nome: 'Ana',
+        whatsapp: '5541988606636',
+        hora: '0900',
+        frequenciaDias: 7,
+        datas: ['2026-12-01', '2026-12-08', '2026-12-15', '2026-12-22', '2026-12-29'],
+      }),
+    );
+    expect(vi.mocked(reservarSerie).mock.calls[0]?.[0].travasDe('2026-12-08')).toEqual([
+      '2026-12-08_0900',
+      '2026-12-08_1000',
+    ]);
+    expect(await screen.findByText('Horário fixo')).toBeInTheDocument();
+    expect(screen.getByText('terça-feira, 22 de dezembro, às 09:00')).toBeInTheDocument();
+    expect(screen.getByText(/15 de dezembro, às 09:00: já estava ocupado/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Todas as datas/ })).toBeInTheDocument();
+    expect(reservar).not.toHaveBeenCalled();
   });
 
   it('RF14: página pausada mostra o aviso e não deixa pedir', () => {

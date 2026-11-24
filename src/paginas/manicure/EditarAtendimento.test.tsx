@@ -16,6 +16,7 @@ import {
   registrarResultado,
   registrarSinalPedido,
 } from '../../servicos/agenda';
+import { encerrarSerie } from '../../servicos/series';
 import { salvarCliente } from '../../servicos/clientes';
 import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 import EditarAtendimento from './EditarAtendimento';
@@ -45,6 +46,7 @@ vi.mock('../../hooks/usePagamento', () => ({
   }),
 }));
 vi.mock('../../hooks/useLinkCurto', () => ({ useLinkCurto: () => 'https://is.gd/agenda' }));
+vi.mock('../../servicos/series', () => ({ encerrarSerie: vi.fn(async () => 3) }));
 
 const ANA = {
   id: 'c1',
@@ -203,6 +205,21 @@ describe('EditarAtendimento (RF07)', () => {
     sinal.addEventListener('click', (e) => e.preventDefault());
     await userEvent.click(sinal);
     expect(registrarSinalPedido).toHaveBeenCalledWith('a1', 1750);
+  });
+
+  it('I11: encerra o horário fixo depois de confirmar', async () => {
+    vi.mocked(useAgendamento).mockReturnValue({
+      dados: { ...ATUAL, serieId: 'f1' },
+      carregando: false,
+      erro: false,
+    });
+    renderizar('/atendimentos/a1');
+    await userEvent.click(screen.getByRole('button', { name: 'Encerrar horário fixo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, encerrar' }));
+    expect(encerrarSerie).toHaveBeenCalledWith('f1');
+    expect(
+      await screen.findByText(/Horário fixo de Ana encerrado: 3 horários ficaram livres/),
+    ).toBeInTheDocument();
   });
 
   it('ao editar, o horário atual não aparece como ocupado e as travas antigas vão junto', async () => {

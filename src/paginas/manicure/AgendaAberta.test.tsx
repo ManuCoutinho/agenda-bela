@@ -4,10 +4,24 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMesesAbertos } from '../../hooks/useMesesAbertos';
 import { salvarMesesAbertos } from '../../servicos/configPublica';
+import { reservarSeriesNoMes } from '../../servicos/series';
 import AgendaAberta from './AgendaAberta';
 
 vi.mock('../../hooks/useMesesAbertos', () => ({ useMesesAbertos: vi.fn() }));
 vi.mock('../../servicos/configPublica', () => ({ salvarMesesAbertos: vi.fn() }));
+vi.mock('../../servicos/series', () => ({ reservarSeriesNoMes: vi.fn() }));
+vi.mock('../../hooks/useServicos', () => ({
+  useServicos: () => ({ servicos: [MAO], carregando: false, erro: false }),
+}));
+vi.mock('../../hooks/useConfiguracoes', () => ({
+  useConfiguracoes: () => ({
+    config: { intervaloMin: 0 },
+    carregando: false,
+    erro: false,
+  }),
+}));
+
+const MAO = { id: 's1', nome: 'Mão', duracaoMin: 60, precoCentavos: 3500, publico: true };
 
 const renderizar = () =>
   render(
@@ -20,6 +34,7 @@ describe('Agenda aberta (I06)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date('2026-11-24T15:00:00Z'), toFake: ['Date'] });
     vi.mocked(salvarMesesAbertos).mockReset();
+    vi.mocked(reservarSeriesNoMes).mockReset().mockResolvedValue([]);
     vi.mocked(useMesesAbertos).mockReturnValue({
       meses: [202611],
       carregando: false,
@@ -37,10 +52,36 @@ describe('Agenda aberta (I06)', () => {
     expect(screen.getByRole('switch', { name: /dezembro de 2026/ })).not.toBeChecked();
   });
 
-  it('abre janeiro sem abrir dezembro (meses avulsos)', async () => {
+  it('abre janeiro sem abrir dezembro, reservando antes os horários fixos', async () => {
     renderizar();
     await userEvent.click(screen.getByRole('switch', { name: /janeiro de 2027/ }));
+    expect(reservarSeriesNoMes).toHaveBeenCalledWith(202701, [MAO], 0);
     expect(salvarMesesAbertos).toHaveBeenCalledWith([202611, 202701]);
+  });
+
+  it('mostra os horários fixos que não couberam, com a mensagem pronta', async () => {
+    vi.mocked(reservarSeriesNoMes).mockResolvedValue([
+      {
+        serie: {
+          id: 'f1',
+          nome: 'Bia',
+          whatsapp: '5541911112222',
+          servicoId: 's1',
+          hora: '1000',
+          frequenciaDias: 7,
+          primeiraData: '2026-11-28',
+          ativa: true,
+        },
+        data: '2027-01-02',
+      },
+    ]);
+    renderizar();
+    await userEvent.click(screen.getByRole('switch', { name: /janeiro de 2027/ }));
+    expect(await screen.findByText('Bia: sábado, 2 de janeiro, às 10:00')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Avisar Bia no WhatsApp' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('wa.me/5541911112222'),
+    );
   });
 
   it('fecha um mês aberto', async () => {

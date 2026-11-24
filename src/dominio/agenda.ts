@@ -44,6 +44,8 @@ export type Agendamento = {
   lembreteEnviado?: boolean;
   /** Pedido da página pública que originou o atendimento. */
   pedidoId?: string;
+  /** I11: atendimento de um horário fixo. */
+  serieId?: string;
   /** I10: quando a confirmação foi enviada pelo WhatsApp. */
   confirmacaoEnviadaEm?: Date;
   /** I10: quando o sinal foi pedido pelo WhatsApp. */

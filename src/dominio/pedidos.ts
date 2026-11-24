@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Agendamento } from './agenda';
 import { normalizarWhatsApp } from './clientes';
+import type { Repeticao } from './series';
 
 /** RN02: o pedido segura o horário por 24 h (as regras aceitam até 24 h). */
 export const VALIDADE_PEDIDO_MS = 24 * 3_600_000;
@@ -23,6 +24,10 @@ export type Pedido = {
   travas: string[];
   status: StatusPedido;
   criadoEm: Date;
+  /** I11: data de um horário fixo. */
+  serieId?: string;
+  /** I11: reservado pela dona ao abrir o mês (a cliente já sabe): sem aviso na fila. */
+  semAviso?: boolean;
 };
 
 export type TipoAviso = 'confirmacao' | 'troca' | 'recusa';
@@ -69,6 +74,11 @@ export const esquemaPedido = z.object({
     }
     return numero;
   }),
+  // I11: repetir o horário (0 = só este)
+  repetir: z.coerce
+    .number<string>()
+    .refine((n): n is Repeticao => [0, 7, 14, 28].includes(n), 'Escolha uma opção da lista.')
+    .transform((n) => n as Repeticao),
 });
 
 export type CamposPedido = z.input<typeof esquemaPedido>;

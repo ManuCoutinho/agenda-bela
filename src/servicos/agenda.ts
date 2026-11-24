@@ -41,6 +41,7 @@ const paraAgendamento = (id: string, d: DocumentData): Agendamento => ({
   observacao: String(d.observacao ?? ''),
   lembreteEnviado: d.lembreteEm instanceof Timestamp,
   pedidoId: typeof d.pedidoId === 'string' ? d.pedidoId : undefined,
+  serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
   confirmacaoEnviadaEm: paraData(d.confirmacaoEm) ?? undefined,
   sinalPedidoEm: paraData(d.sinalPedidoEm) ?? undefined,
 });

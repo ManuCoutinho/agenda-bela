@@ -345,3 +345,70 @@ describe('confirmação automática (I08)', () => {
     await assertFails(confirmar(['2026-12-01_0900']).commit());
   });
 });
+
+describe('horário fixo (I11)', () => {
+  const serie = (extra: Record<string, unknown> = {}) => ({
+    nome: 'Ana',
+    whatsapp: '5511987654321',
+    servicoId: 'alongamento',
+    hora: '1000',
+    frequenciaDias: 7,
+    primeiraData: '2026-12-05',
+    ativa: true,
+    criadoEm: serverTimestamp(),
+    ...extra,
+  });
+
+  /** Uma data da série: pedido confirmado + travas; a série vai junto na primeira. */
+  function data(serieId: string, ids: string[], comSerie: Record<string, unknown> | null) {
+    const db = visitante();
+    const ref = db.doc(`pedidos/${serieId}_${ids[0]?.slice(0, 10)}`);
+    const lote = db.batch();
+    if (comSerie) lote.set(db.doc(`series/${serieId}`), comSerie);
+    for (const id of ids) {
+      const [d, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data: d, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', serieId }));
+    return lote.commit();
+  }
+
+  it('grava a série com a primeira data e as outras datas em lotes separados', async () => {
+    await assertSucceeds(data('s1', ['2026-12-05_1000'], serie()));
+    await assertSucceeds(data('s1', ['2026-12-12_1000'], null));
+  });
+
+  it('uma data ocupada falha sozinha; as outras seguem', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await confirmarAvulso('2026-12-12_1000');
+    await assertFails(data('s1', ['2026-12-12_1000'], null));
+    await assertSucceeds(data('s1', ['2026-12-19_1000'], null));
+  });
+
+  it('pedido com série que não existe ou de outro WhatsApp é recusado', async () => {
+    await assertFails(data('nao-existe', ['2026-12-05_1000'], null));
+    await assertFails(data('s2', ['2026-12-05_1000'], serie({ whatsapp: '5511900000000' })));
+  });
+
+  it('série com campos inválidos é recusada', async () => {
+    await assertFails(data('s3', ['2026-12-05_1000'], serie({ frequenciaDias: 3 })));
+    await assertFails(data('s4', ['2026-12-05_1000'], serie({ ativa: false })));
+    await assertFails(data('s5', ['2026-12-05_1000'], serie({ hora: '1030' })));
+  });
+
+  it('visitante não lê séries; manicure lê e encerra', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await assertFails(visitante().doc('series/s1').get());
+    await assertSucceeds(manicure().doc('series/s1').update({ ativa: false }));
+  });
+
+  async function confirmarAvulso(id: string) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const [d, hora] = id.split('_');
+    const lote = db.batch();
+    lote.set(db.doc(`travas/${id}`), { data: d, hora, expiraEm: null, pedidoId: ref.id });
+    lote.set(ref, pedido([id], { status: 'confirmado' }));
+    await lote.commit();
+  }
+});

@@ -55,11 +55,20 @@ service cloud.firestore {
           || (local.year() * 100 + local.month()) in get(publico).data.mesesAbertos;
       }
 
+      // I11: data de um horário fixo: a série existe ao fim do lote e é da mesma cliente
+      function daSerie(d) {
+        return !('serieId' in d) || (d.serieId is string
+          && getAfter(/databases/$(database)/documents/series/$(d.serieId)) != null
+          && getAfter(/databases/$(database)/documents/series/$(d.serieId)).data.whatsapp == d.whatsapp);
+      }
+
       allow read, update, delete: if isOwner();
       allow create: if paginaAberta()
         && mesAberto(request.resource.data.inicio)
         && request.resource.data.keys().hasOnly(
-          ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
+          ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas',
+           'serieId'])
+        && daSerie(request.resource.data)
         && request.resource.data.keys().hasAll(
           ['nome', 'whatsapp', 'servicoId', 'inicio', 'consentimento', 'status', 'criadoEm', 'travas'])
         && request.resource.data.nome is string
@@ -91,6 +100,30 @@ service cloud.firestore {
         && travaNaPosicao(request.resource.data.travas, 9)
         && travaNaPosicao(request.resource.data.travas, 10)
         && travaNaPosicao(request.resource.data.travas, 11);
+    }
+
+    // I11: horário fixo pedido pela cliente; a dona lê, encerra e apaga
+    match /series/{id} {
+      allow read, update, delete: if isOwner();
+      allow create: if request.resource.data.keys().hasOnly(
+          ['nome', 'whatsapp', 'servicoId', 'hora', 'frequenciaDias', 'primeiraData', 'ativa',
+           'criadoEm'])
+        && request.resource.data.keys().hasAll(
+          ['nome', 'whatsapp', 'servicoId', 'hora', 'frequenciaDias', 'primeiraData', 'ativa',
+           'criadoEm'])
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.nome.size() <= 80
+        && request.resource.data.whatsapp is string
+        && request.resource.data.whatsapp.matches('^[0-9]{12,13}$')
+        && request.resource.data.servicoId is string
+        && request.resource.data.hora is string
+        && request.resource.data.hora.matches('^[0-2][0-9]00$')
+        && request.resource.data.frequenciaDias in [7, 14, 28]
+        && request.resource.data.primeiraData is string
+        && request.resource.data.primeiraData.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.ativa == true
+        && request.resource.data.criadoEm == request.time;
     }
 
     match /travas/{id} {

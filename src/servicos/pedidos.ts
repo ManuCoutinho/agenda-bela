@@ -12,8 +12,11 @@ import {
   where,
   writeBatch,
   type DocumentData,
+  type DocumentReference,
+  type WriteBatch,
 } from 'firebase/firestore';
-import { HorarioOcupado, travaLivre } from '../dominio/agenda';
+import { HorarioOcupado, inicioEm, travaLivre } from '../dominio/agenda';
+import { idPedidoDaSerie } from '../dominio/series';
 import {
   HorarioJaPedido,
   pedidoExpirado,
@@ -46,12 +49,26 @@ export class SemInternet extends Error {
  * `confirmado` e as travas definitivas dele. Se alguma trava já estiver ocupada,
  * as regras recusam o lote inteiro e nada é gravado: lança `HorarioJaPedido`.
  */
-export async function reservar(
-  dados: DadosPedido & { servicoId: string; inicio: Date; travas: string[] },
-): Promise<void> {
+type DadosReserva = Pick<DadosPedido, 'nome' | 'whatsapp'> & {
+  servicoId: string;
+  inicio: Date;
+  travas: string[];
+};
+
+export async function reservar(dados: DadosReserva): Promise<void> {
   if (!navigator.onLine) throw new SemInternet();
-  const ref = doc(pedidos);
   const lote = writeBatch(db);
+  incluirReserva(lote, doc(pedidos), dados);
+  await gravarReserva(lote);
+}
+
+/** Pedido confirmado e as travas definitivas dele, no lote. */
+function incluirReserva(
+  lote: WriteBatch,
+  ref: DocumentReference,
+  dados: DadosReserva,
+  extra: Record<string, unknown> = {},
+) {
   for (const id of dados.travas) {
     const [data, hora] = id.split('_');
     lote.set(doc(travas, id), { data, hora, expiraEm: null, pedidoId: ref.id });
@@ -65,8 +82,12 @@ export async function reservar(
     status: 'confirmado',
     criadoEm: serverTimestamp(),
     travas: dados.travas,
+    ...extra,
   });
+}
 
+/** Grava esperando o servidor; horário tomado vira `HorarioJaPedido`. */
+async function gravarReserva(lote: WriteBatch) {
   let espera: ReturnType<typeof setTimeout> | undefined;
   const tempoEsgotado = new Promise<never>((_, rejeitar) => {
     espera = setTimeout(() => rejeitar(new SemInternet()), ESPERA_MS);
@@ -105,6 +126,8 @@ const paraPedido = (id: string, d: DocumentData): Pedido => ({
   status: STATUS.includes(d.status) ? d.status : 'pendente',
   // logo após o envio, o horário do servidor ainda não chegou
   criadoEm: paraData(d.criadoEm) ?? new Date(),
+  serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
+  semAviso: d.semAviso === true ? true : undefined,
 });
 
 function observarPorStatus(
@@ -201,7 +224,8 @@ export async function aprovarPedido(
     substitui,
     sinalCentavos,
   }: {
-    aviso: Aviso;
+    /** Mensagem para a fila de avisos; sem ela, nada entra na fila. */
+    aviso?: Aviso;
     clienteId?: string;
     /** Troca de horário: o atendimento ou pedido antigo da cliente. */
     substitui?: OutroHorario;
@@ -242,8 +266,7 @@ export async function aprovarPedido(
     tx.update(doc(pedidos, pedido.id), {
       status: 'aprovado',
       respondidoEm: serverTimestamp(),
-      aviso,
-      avisadoEm: null,
+      ...(aviso ? { aviso, avisadoEm: null } : { avisadoEm: serverTimestamp() }),
       agendamentoId: atendimento.id,
     });
 
@@ -255,6 +278,7 @@ export async function aprovarPedido(
       inicio: Timestamp.fromDate(pedido.inicio),
       travas: pedido.travas,
       pedidoId: pedido.id,
+      ...(pedido.serieId ? { serieId: pedido.serieId } : {}),
       atualizadoEm: serverTimestamp(),
     };
     if (substitui?.tipo === 'agendamento') {
@@ -333,4 +357,71 @@ export function descartarPedido(pedido: Pedido) {
   gravarEmSegundoPlano(
     updateDoc(doc(pedidos, pedido.id), { status: 'expirado', respondidoEm: serverTimestamp() }),
   );
+}
+
+export type FalhaSerie = { data: string; motivo: 'ocupado' | 'sem-internet' | 'erro' };
+
+/**
+ * I11: horário fixo pedido pela cliente. Cada data é um lote (pedido + travas)
+ * e falha sozinha se o horário estiver tomado; a série vai junto com a
+ * primeira data que der certo. Devolve as datas reservadas e as que falharam.
+ */
+export async function reservarSerie(
+  dados: Pick<DadosPedido, 'nome' | 'whatsapp'> & {
+    servicoId: string;
+    hora: string;
+    frequenciaDias: number;
+    datas: readonly string[];
+    travasDe: (data: string) => string[];
+  },
+): Promise<{ reservadas: string[]; falhas: FalhaSerie[] }> {
+  if (!navigator.onLine) throw new SemInternet();
+  const serie = doc(collection(db, 'series'));
+  const reservadas: string[] = [];
+  const falhas: FalhaSerie[] = [];
+  for (const data of dados.datas) {
+    const lote = writeBatch(db);
+    if (reservadas.length === 0) {
+      lote.set(serie, {
+        nome: dados.nome,
+        whatsapp: dados.whatsapp,
+        servicoId: dados.servicoId,
+        hora: dados.hora,
+        frequenciaDias: dados.frequenciaDias,
+        primeiraData: dados.datas[0],
+        ativa: true,
+        criadoEm: serverTimestamp(),
+      });
+    }
+    incluirReserva(
+      lote,
+      doc(pedidos, idPedidoDaSerie(serie.id, data)),
+      {
+        nome: dados.nome,
+        whatsapp: dados.whatsapp,
+        servicoId: dados.servicoId,
+        inicio: inicioEm(data, dados.hora),
+        travas: dados.travasDe(data),
+      },
+      { serieId: serie.id },
+    );
+    try {
+      await gravarReserva(lote);
+      reservadas.push(data);
+    } catch (erro) {
+      if (!(erro instanceof HorarioJaPedido) && !(erro instanceof SemInternet)) {
+        console.error(erro);
+      }
+      falhas.push({
+        data,
+        motivo:
+          erro instanceof HorarioJaPedido
+            ? 'ocupado'
+            : erro instanceof SemInternet
+              ? 'sem-internet'
+              : 'erro',
+      });
+    }
+  }
+  return { reservadas, falhas };
 }

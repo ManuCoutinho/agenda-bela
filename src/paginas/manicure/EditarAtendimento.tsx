@@ -35,6 +35,7 @@ import {
   registrarResultado,
   registrarSinalPedido,
 } from '../../servicos/agenda';
+import { encerrarSerie } from '../../servicos/series';
 import { salvarCliente } from '../../servicos/clientes';
 import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 
@@ -81,6 +82,8 @@ export default function EditarAtendimento() {
   const ocupadosDoDia = useOcupados(data).dados;
   const [erroEnvio, setErroEnvio] = useState<string>();
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  const [confirmandoEncerrar, setConfirmandoEncerrar] = useState(false);
+  const [erroEncerrar, setErroEncerrar] = useState<string>();
 
   const aoMudarData = useCallback((d: string) => setDataEscolhida(d), []);
 
@@ -164,6 +167,21 @@ export default function EditarAtendimento() {
     navegar(destino(dataDoDia(atual.inicio)), {
       state: { aviso: `Atendimento de ${atual.clienteNome} cancelado. O horário ficou livre.` },
     });
+  }
+
+  async function encerrar() {
+    if (!atual?.serieId) return;
+    setErroEncerrar(undefined);
+    try {
+      const n = await encerrarSerie(atual.serieId);
+      const livres = n === 1 ? '1 horário ficou livre' : `${n} horários ficaram livres`;
+      navegar(destino(dataDoDia(atual.inicio)), {
+        state: { aviso: `Horário fixo de ${atual.clienteNome} encerrado: ${livres}.` },
+      });
+    } catch (e) {
+      console.error(e);
+      setErroEncerrar('Não foi possível encerrar. Confira a internet e tente de novo.');
+    }
   }
 
   const titulo = id ? 'Atendimento' : 'Novo atendimento';
@@ -286,6 +304,43 @@ export default function EditarAtendimento() {
             aoEnviarConfirmacao={() => marcarConfirmacaoEnviada(atual)}
             aoPedirSinal={(centavos) => registrarSinalPedido(atual.id, centavos)}
           />
+        </section>
+      )}
+
+      {atual?.serieId && atual.status === 'marcado' && (
+        <section aria-labelledby="horario-fixo" className="mt-10 border-t border-borda pt-6">
+          <h2 id="horario-fixo" className="text-secao font-medium">
+            Horário fixo
+          </h2>
+          <p className="mt-1 text-texto-suave">
+            {atual.clienteNome} tem este horário fixo. Ele é reservado sozinho quando você abre um
+            mês novo.
+          </p>
+          {erroEncerrar && (
+            <p role="alert" className="mt-3 text-erro">
+              {erroEncerrar}
+            </p>
+          )}
+          {confirmandoEncerrar ? (
+            <div className="mt-3 flex flex-col gap-3">
+              <p>
+                Encerrar o horário fixo de {atual.clienteNome}? Os próximos atendimentos dele são
+                cancelados e os horários ficam livres.
+              </p>
+              <Botao onClick={() => void encerrar()}>Sim, encerrar</Botao>
+              <Botao variante="secundario" onClick={() => setConfirmandoEncerrar(false)}>
+                Não, manter
+              </Botao>
+            </div>
+          ) : (
+            <Botao
+              variante="secundario"
+              className="mt-3 w-full"
+              onClick={() => setConfirmandoEncerrar(true)}
+            >
+              Encerrar horário fixo
+            </Botao>
+          )}
         </section>
       )}
 

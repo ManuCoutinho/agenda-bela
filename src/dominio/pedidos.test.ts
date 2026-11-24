@@ -29,11 +29,13 @@ describe('pedidos (RF09, RN02)', () => {
   });
 
   it('normaliza o WhatsApp e exige nome e número', () => {
-    expect(esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636' })).toEqual({
-      nome: 'Ana',
-      whatsapp: '5541988606636',
-    });
-    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123' });
+    expect(
+      esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636', repetir: '7' }),
+    ).toEqual({ nome: 'Ana', whatsapp: '5541988606636', repetir: 7 });
+    expect(
+      esquemaPedido.safeParse({ nome: 'Ana', whatsapp: '41988606636', repetir: '3' }).success,
+    ).toBe(false);
+    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123', repetir: '0' });
     expect(r.success).toBe(false);
     expect(r.error?.issues.map((i) => i.path[0])).toEqual(['nome', 'whatsapp']);
   });

@@ -35,13 +35,20 @@ import { linkWhatsApp } from '../../dominio/whatsapp';
 import { useOcupadosNoPeriodo } from '../../hooks/useAgenda';
 import { usePaginaPublica } from '../../hooks/usePaginaPublica';
 import type { PaginaPublica } from '../../servicos/configPublica';
-import { reservar, SemInternet } from '../../servicos/pedidos';
+import { reservar, reservarSerie, SemInternet, type FalhaSerie } from '../../servicos/pedidos';
+import { datasDaSerie } from '../../dominio/series';
 import PaginaNaoEncontrada from '../PaginaNaoEncontrada';
 
 const ESTILO_CHIP =
   'flex min-h-12 flex-col items-center justify-center rounded-lg border border-borda-campo bg-superficie px-2 py-2 text-texto hover:bg-marca-suave active:bg-marca-suave focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca';
 
 const SEM_MARCAS: ReadonlyMap<string, MarcasDoDia> = new Map();
+
+const MOTIVO_FALHA: Record<FalhaSerie['motivo'], string> = {
+  ocupado: 'já estava ocupado',
+  'sem-internet': 'a internet caiu',
+  erro: 'não foi possível agora',
+};
 
 const quando = (dia: string, hora: string) => `${rotuloDia(dia)}, às ${rotuloHora(hora)}`;
 
@@ -66,7 +73,15 @@ export default function Agendar() {
   return <Passos pagina={pagina} />;
 }
 
-type Enviado = { nome: string; servico: Servico; dia: string; hora: string };
+type Enviado = {
+  nome: string;
+  servico: Servico;
+  hora: string;
+  /** Datas reservadas (uma, ou as do horário fixo). */
+  dias: string[];
+  /** Horário fixo: datas que não deram certo. */
+  falhas: FalhaSerie[];
+};
 
 function Passos({ pagina }: { pagina: PaginaPublica }) {
   const { config } = pagina;
@@ -140,15 +155,31 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   async function pedir(dados: DadosPedido) {
     if (!servico || !dia || !hora) return;
     setErroEnvio(undefined);
-    const inicio = inicioEm(dia, hora);
+    const travasDe = (d: string) =>
+      idsTravas(inicioEm(d, hora), servico.duracaoMin, config.intervaloMin);
     try {
+      if (dados.repetir > 0) {
+        const r = await reservarSerie({
+          nome: dados.nome,
+          whatsapp: dados.whatsapp,
+          servicoId: servico.id,
+          hora,
+          frequenciaDias: dados.repetir,
+          datas: datasDaSerie(dia, dados.repetir, regras.mesesAbertos, new Date()),
+          travasDe,
+        });
+        if (r.reservadas.length === 0) throw new HorarioJaPedido();
+        setEnviado({ nome: dados.nome, servico, hora, dias: r.reservadas, falhas: r.falhas });
+        return;
+      }
       await reservar({
-        ...dados,
+        nome: dados.nome,
+        whatsapp: dados.whatsapp,
         servicoId: servico.id,
-        inicio,
-        travas: idsTravas(inicio, servico.duracaoMin, config.intervaloMin),
+        inicio: inicioEm(dia, hora),
+        travas: travasDe(dia),
       });
-      setEnviado({ nome: dados.nome, servico, dia, hora });
+      setEnviado({ nome: dados.nome, servico, hora, dias: [dia], falhas: [] });
     } catch (e) {
       if (e instanceof HorarioJaPedido) {
         setBusca({ servico: servico.id, dia });
@@ -377,7 +408,11 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
           <p className="mb-4 text-texto-suave">
             Ao tocar em Marcar horário, ele já fica reservado para você.
           </p>
-          <FormularioPedido aoEnviar={pedir} erro={erroEnvio} />
+          <FormularioPedido
+            aoEnviar={pedir}
+            erro={erroEnvio}
+            datasDaRepeticao={(r) => datasDaSerie(dia, r, regras.mesesAbertos, agora)}
+          />
         </>
       ) : (
         <p role="alert" className="text-erro">
@@ -485,20 +520,25 @@ function Confirmacao({
   whatsapp: string;
   aoPedirOutro: () => void;
 }) {
-  const { servico } = enviado;
+  const { servico, dias, hora, falhas } = enviado;
+  const [primeiro] = dias as [string, ...string[]];
+  const fixo = dias.length + falhas.length > 1;
   const texto = textoAvisoPedido({
     nome: enviado.nome,
     servico: servico.nome,
-    quando: quando(enviado.dia, enviado.hora),
+    quando: fixo ? `${quando(primeiro, hora)} (horário fixo)` : quando(primeiro, hora),
   });
-  const inicio = inicioEm(enviado.dia, enviado.hora);
-  const evento: EventoAgenda = {
-    id: `${enviado.dia}_${enviado.hora}_${enviado.servico.id}`,
-    titulo: tituloEvento(espaco),
-    inicio,
-    fim: new Date(inicio.getTime() + servico.duracaoMin * 60_000),
-    detalhes: `${servico.nome} (${formatarDuracao(servico.duracaoMin)})`,
-  };
+  const eventos: EventoAgenda[] = dias.map((d) => {
+    const inicio = inicioEm(d, hora);
+    return {
+      id: `${d}_${hora}_${servico.id}`,
+      titulo: tituloEvento(espaco),
+      inicio,
+      fim: new Date(inicio.getTime() + servico.duracaoMin * 60_000),
+      detalhes: `${servico.nome} (${formatarDuracao(servico.duracaoMin)})`,
+    };
+  });
+  const [evento] = eventos as [EventoAgenda, ...EventoAgenda[]];
   return (
     <section aria-labelledby="enviado" className="flex flex-col gap-6 pt-4">
       <div className="flex flex-col items-center gap-2 text-center">
@@ -517,10 +557,12 @@ function Confirmacao({
           </dd>
         </div>
         <div>
-          <dt className="text-texto-suave">Quando</dt>
-          <dd className="font-medium first-letter:uppercase">
-            {quando(enviado.dia, enviado.hora)}
-          </dd>
+          <dt className="text-texto-suave">{fixo ? 'Horário fixo' : 'Quando'}</dt>
+          {dias.map((d) => (
+            <dd key={d} className="font-medium first-letter:uppercase">
+              {quando(d, hora)}
+            </dd>
+          ))}
         </div>
         {servico.precoCentavos > 0 && (
           <div>
@@ -529,6 +571,26 @@ function Confirmacao({
           </div>
         )}
       </dl>
+      {falhas.length > 0 && (
+        <section
+          aria-labelledby="sem-reserva"
+          className="rounded-xl border border-borda bg-superficie p-4"
+        >
+          <h3 id="sem-reserva" className="font-medium">
+            Não deu para reservar:
+          </h3>
+          <ul className="mt-2 flex flex-col gap-1">
+            {falhas.map((f) => (
+              <li key={f.data} className="first-letter:uppercase">
+                {quando(f.data, hora)}: {MOTIVO_FALHA[f.motivo]}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-texto-suave">
+            Se quiser outro horário nesses dias, fale com {espaco || 'o espaço'} no WhatsApp.
+          </p>
+        </section>
+      )}
       <p>{espaco || 'O espaço'} manda a confirmação pelo WhatsApp e, na véspera, um lembrete.</p>
       <section aria-labelledby="salvar" className="flex flex-col gap-3">
         <h3 id="salvar" className="text-secao font-medium">
@@ -541,15 +603,15 @@ function Confirmacao({
           className={ESTILO_BOTAO.secundario}
         >
           <Icone nome="hoje" />
-          Google Agenda
+          {fixo ? 'Google Agenda (primeira data)' : 'Google Agenda'}
         </a>
         <a
-          href={linkArquivoIcs(arquivoIcs([evento], new Date()))}
+          href={linkArquivoIcs(arquivoIcs(eventos, new Date()))}
           download="horario-marcado.ics"
           className={ESTILO_BOTAO.secundario}
         >
           <Icone nome="hoje" />
-          iPhone e outras agendas
+          {fixo ? 'Todas as datas (iPhone e outras agendas)' : 'iPhone e outras agendas'}
         </a>
       </section>
       <div className="flex flex-col gap-3">

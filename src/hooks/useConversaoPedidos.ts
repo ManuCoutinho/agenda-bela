@@ -53,7 +53,10 @@ export function useConversaoPedidos() {
             endereco: configuracoes.config.endereco,
             linkAgenda: curto ?? agenda,
           });
-          return aprovarPedido(p, servico, { aviso: { tipo: 'confirmacao', texto }, clienteId });
+          return aprovarPedido(p, servico, {
+            aviso: p.semAviso ? undefined : { tipo: 'confirmacao', texto },
+            clienteId,
+          });
         })
         .catch((erro: unknown) => console.error(erro));
     }

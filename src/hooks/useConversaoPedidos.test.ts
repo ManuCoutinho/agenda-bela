@@ -71,7 +71,7 @@ describe('conversão automática dos horários confirmados (I08)', () => {
         ),
       },
     });
-    expect(vi.mocked(aprovarPedido).mock.calls[0]?.[2].aviso.texto).toContain(
+    expect(vi.mocked(aprovarPedido).mock.calls[0]?.[2].aviso?.texto).toContain(
       'Salvar na sua agenda: https://is.gd/agenda',
     );
   });

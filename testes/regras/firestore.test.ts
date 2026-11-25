@@ -563,3 +563,111 @@ describe('remarcar e pedir cancelamento (I14)', () => {
     );
   });
 });
+
+describe('remarcar e cancelar antes de a dona abrir o app (I14, pelo pedido)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+
+  /** Cliente marca pela página: pedido confirmado com a chave + travas com pedidoId. */
+  async function marcar(ids: string[], horas = 72) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of ids) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', chave: CHAVE, inicio: daqui(horas) }));
+    await lote.commit();
+    return ref.id;
+  }
+
+  function remarcarPedido(antigo: string, soltar: string[], novas: string[], chave = CHAVE) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of novas) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    for (const id of soltar) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: chave,
+        horario: antigo,
+        pedidoNovo: ref.id,
+      });
+    }
+    lote.set(
+      ref,
+      pedido(novas, {
+        status: 'confirmado',
+        chave,
+        substitui: antigo,
+        substituiInicio: daqui(72),
+      }),
+    );
+    return lote.commit();
+  }
+
+  it('remarca um horário recém-marcado, sem portal', async () => {
+    const antigo = await marcar(['2026-12-01_0900', '2026-12-01_1000']);
+    await assertSucceeds(
+      remarcarPedido(antigo, ['2026-12-01_0900', '2026-12-01_1000'], ['2026-12-03_1400']),
+    );
+  });
+
+  it('o maior serviço (3 h) também cabe no limite das regras', async () => {
+    const tres = ['2026-12-01_0900', '2026-12-01_1000', '2026-12-01_1100'];
+    const antigo = await marcar(tres);
+    await assertSucceeds(
+      remarcarPedido(antigo, tres, ['2026-12-03_1400', '2026-12-03_1500', '2026-12-03_1600']),
+    );
+  });
+
+  it('não solta trava de outra pessoa nem com a chave errada', async () => {
+    const antigo = await marcar(['2026-12-01_0900']);
+    await reservarOutra('2026-12-02_0900');
+    await assertFails(remarcarPedido(antigo, ['2026-12-02_0900'], ['2026-12-03_1400']));
+    await assertFails(
+      remarcarPedido(antigo, ['2026-12-01_0900'], ['2026-12-03_1500'], 'outraChaveQualquer12345'),
+    );
+  });
+
+  it('com menos de 24 h, não remarca nem pede cancelamento', async () => {
+    const antigo = await marcar(['2026-12-01_0900'], 12);
+    await assertFails(remarcarPedido(antigo, ['2026-12-01_0900'], ['2026-12-03_1400']));
+    await assertFails(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: antigo,
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('pede cancelamento de um horário recém-marcado', async () => {
+    const antigo = await marcar(['2026-12-01_0900']);
+    await assertSucceeds(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: antigo,
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+
+  async function reservarOutra(id: string) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const [data, hora] = id.split('_');
+    const lote = db.batch();
+    lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    lote.set(ref, pedido([id], { status: 'confirmado' }));
+    await lote.commit();
+  }
+});

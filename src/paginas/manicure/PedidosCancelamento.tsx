@@ -8,9 +8,8 @@ import {
   type Solicitacao,
 } from '../../dominio/pedidos';
 import { linkWhatsApp } from '../../dominio/whatsapp';
-import { useAgendamento } from '../../hooks/useAgenda';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
-import { useSolicitacoes } from '../../hooks/useSolicitacoes';
+import { useAtendimentoDoHorario, useSolicitacoes } from '../../hooks/useSolicitacoes';
 import { marcarSolicitacaoAvisada, responderCancelamento } from '../../servicos/solicitacoes';
 
 /** I14: cancelamentos pedidos pelas clientes em "Meus horários", no topo da Hoje. */
@@ -33,7 +32,7 @@ export default function PedidosCancelamento() {
 }
 
 function Cartao({ solicitacao: s }: { solicitacao: Solicitacao }) {
-  const { dados: atendimento, carregando } = useAgendamento(s.horario);
+  const { dados: atendimento, carregando } = useAtendimentoDoHorario(s.horario);
   const { config } = useConfiguracoes();
   const nome = atendimento?.clienteNome ?? 'A cliente';
   const quando = atendimento ? rotuloInicio(atendimento.inicio) : '';

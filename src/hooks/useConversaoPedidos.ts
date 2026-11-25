@@ -11,6 +11,9 @@ import { useServicos } from './useServicos';
 /** Pedidos já tentados nesta sessão: não repete a cada atualização da tela. */
 const tentados = new Set<string>();
 
+/** Uma conversão por vez: a remarcação resolve o pedido antigo antes de ele ser tentado. */
+let fila: Promise<unknown> = Promise.resolve();
+
 /**
  * I08: enquanto o app da dona está aberto, cada horário que uma cliente
  * confirmou vira atendimento (e cliente, se nova) e entra na fila de avisos.
@@ -26,8 +29,11 @@ export function useConversaoPedidos() {
 
   useEffect(() => {
     if (!pronto) return;
-    for (const p of confirmados) {
-      if (tentados.has(p.id)) continue;
+    // remarcações primeiro (I14)
+    const novos = confirmados
+      .filter((p) => !tentados.has(p.id))
+      .sort((a, b) => Number(Boolean(b.substitui)) - Number(Boolean(a.substitui)));
+    for (const p of novos) {
       tentados.add(p.id);
       const servico = servicos.servicos.find((s) => s.id === p.servicoId) ?? {
         id: p.servicoId,
@@ -44,7 +50,8 @@ export function useConversaoPedidos() {
           duracaoMin: servico.duracaoMin,
         }),
       );
-      encurtarLink(agenda)
+      fila = fila
+        .then(() => encurtarLink(agenda))
         .then((curto) => {
           const mensagem = {
             nome: p.nome,

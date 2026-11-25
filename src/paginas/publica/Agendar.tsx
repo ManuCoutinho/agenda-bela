@@ -55,7 +55,7 @@ import {
   SemInternet,
   type FalhaSerie,
 } from '../../servicos/pedidos';
-import { datasDaSerie } from '../../dominio/series';
+import { datasDaSerie, idPedidoDaSerie } from '../../dominio/series';
 import MeusHorarios from '../../componentes/MeusHorarios';
 import Campo from '../../componentes/Campo';
 import { ESTILO_CAMPO } from '../../componentes/estilos';
@@ -138,12 +138,13 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
   const meusHorarios = juntarHorarios(
     (portal.portal?.horarios ?? []).filter((h) => !trocados.includes(h.id)),
     lerHorariosLocais().map((h) => ({
-      id: `local-${h.inicio}`,
+      // com o id do pedido dá para remarcar e cancelar na hora (I14)
+      id: h.pedidoId ?? `local-${h.inicio}`,
       inicio: new Date(h.inicio),
       servico: h.servico,
-      servicoId: '',
+      servicoId: h.servicoId ?? '',
       duracaoMin: h.duracaoMin,
-      travas: [],
+      travas: h.travas ?? [],
     })),
     new Date(),
   );
@@ -216,12 +217,13 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
     if (!servico || !dia || !hora || !antigo || !aparelho?.chave) return;
     setErroEnvio(undefined);
     try {
-      await remarcar({
+      const novas = idsTravas(inicioEm(dia, hora), servico.duracaoMin, config.intervaloMin);
+      const pedidoNovo = await remarcar({
         nome: aparelho.nome || portal.portal?.nome || 'Cliente',
         whatsapp: aparelho.whatsapp,
         servicoId: servico.id,
         inicio: inicioEm(dia, hora),
-        travas: idsTravas(inicioEm(dia, hora), servico.duracaoMin, config.intervaloMin),
+        travas: novas,
         chave: aparelho.chave,
         antigo,
       });
@@ -231,7 +233,10 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
         {
           inicio: inicioEm(dia, hora).toISOString(),
           servico: servico.nome,
+          servicoId: servico.id,
           duracaoMin: servico.duracaoMin,
+          pedidoId: pedidoNovo,
+          travas: novas,
         },
       ]);
       setEnviado({
@@ -261,16 +266,19 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
     setErroEnvio(undefined);
     const chave = chaveParaMarcar(dados.nome, dados.whatsapp);
     setAparelho(lerClienteDoAparelho());
-    const lembrar = (dias: string[]) =>
-      guardarHorariosLocais(
-        dias.map((d) => ({
-          inicio: inicioEm(d, hora).toISOString(),
-          servico: servico.nome,
-          duracaoMin: servico.duracaoMin,
-        })),
-      );
     const travasDe = (d: string) =>
       idsTravas(inicioEm(d, hora), servico.duracaoMin, config.intervaloMin);
+    const lembrar = (marcados: { dia: string; pedidoId: string }[]) =>
+      guardarHorariosLocais(
+        marcados.map(({ dia: d, pedidoId }) => ({
+          inicio: inicioEm(d, hora).toISOString(),
+          servico: servico.nome,
+          servicoId: servico.id,
+          duracaoMin: servico.duracaoMin,
+          pedidoId,
+          travas: travasDe(d),
+        })),
+      );
     try {
       if (dados.repetir > 0) {
         const r = await reservarSerie({
@@ -284,11 +292,11 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
           chave,
         });
         if (r.reservadas.length === 0) throw new HorarioJaPedido();
-        lembrar(r.reservadas);
+        lembrar(r.reservadas.map((d) => ({ dia: d, pedidoId: idPedidoDaSerie(r.serieId, d) })));
         setEnviado({ nome: dados.nome, servico, hora, dias: r.reservadas, falhas: r.falhas });
         return;
       }
-      await reservar({
+      const pedidoId = await reservar({
         nome: dados.nome,
         whatsapp: dados.whatsapp,
         servicoId: servico.id,
@@ -296,7 +304,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
         travas: travasDe(dia),
         chave,
       });
-      lembrar([dia]);
+      lembrar([{ dia, pedidoId }]);
       setEnviado({ nome: dados.nome, servico, hora, dias: [dia], falhas: [] });
     } catch (e) {
       if (e instanceof HorarioJaPedido) {

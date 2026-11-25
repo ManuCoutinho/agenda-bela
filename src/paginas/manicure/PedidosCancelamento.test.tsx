@@ -3,15 +3,16 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { inicioEm, type Agendamento } from '../../dominio/agenda';
 import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
-import { useAgendamento } from '../../hooks/useAgenda';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
-import { useSolicitacoes } from '../../hooks/useSolicitacoes';
+import { useAtendimentoDoHorario, useSolicitacoes } from '../../hooks/useSolicitacoes';
 import { marcarSolicitacaoAvisada, responderCancelamento } from '../../servicos/solicitacoes';
 import PedidosCancelamento from './PedidosCancelamento';
 
-vi.mock('../../hooks/useAgenda', () => ({ useAgendamento: vi.fn() }));
 vi.mock('../../hooks/useConfiguracoes', () => ({ useConfiguracoes: vi.fn() }));
-vi.mock('../../hooks/useSolicitacoes', () => ({ useSolicitacoes: vi.fn() }));
+vi.mock('../../hooks/useSolicitacoes', () => ({
+  useSolicitacoes: vi.fn(),
+  useAtendimentoDoHorario: vi.fn(),
+}));
 vi.mock('../../servicos/solicitacoes', () => ({
   responderCancelamento: vi.fn(),
   marcarSolicitacaoAvisada: vi.fn(),
@@ -42,7 +43,7 @@ const PEDIDO = {
 describe('Pedidos de cancelamento (I14)', () => {
   beforeEach(() => {
     vi.mocked(responderCancelamento).mockReset();
-    vi.mocked(useAgendamento).mockReturnValue({
+    vi.mocked(useAtendimentoDoHorario).mockReturnValue({
       dados: ATENDIMENTO,
       carregando: false,
       erro: false,

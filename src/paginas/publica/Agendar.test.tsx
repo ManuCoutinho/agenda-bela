@@ -180,7 +180,7 @@ describe('Página pública (RF08, RF09)', () => {
 
   it('pede o horário com as travas do serviço e oferece avisar no WhatsApp', async () => {
     ocupados();
-    vi.mocked(reservar).mockResolvedValue();
+    vi.mocked(reservar).mockResolvedValue('p-novo');
     await ateOsDados();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.getByText(/ficam guardados só para este agendamento/)).toBeInTheDocument();
@@ -224,6 +224,7 @@ describe('Página pública (RF08, RF09)', () => {
   it('I11: horário fixo reserva as datas dos meses abertos e mostra a que não deu', async () => {
     ocupados();
     vi.mocked(reservarSerie).mockResolvedValue({
+      serieId: 'f1',
       reservadas: ['2026-12-01', '2026-12-08', '2026-12-22', '2026-12-29'],
       falhas: [{ data: '2026-12-15', motivo: 'ocupado' }],
     });
@@ -324,9 +325,31 @@ describe('Página pública (RF08, RF09)', () => {
         carregando: false,
         erro: false,
       });
-      vi.mocked(remarcar).mockReset().mockResolvedValue();
+      vi.mocked(remarcar).mockReset().mockResolvedValue('p-troca');
       vi.mocked(pedirCancelamento).mockReset().mockResolvedValue();
       ocupados();
+    });
+
+    it('horário recém-marcado neste celular já pode ser remarcado ou cancelado', async () => {
+      vi.mocked(usePortal).mockReturnValue({ portal: null, carregando: false, erro: false });
+      localStorage.setItem(
+        'agenda-bela:horarios',
+        JSON.stringify([
+          {
+            inicio: longe.inicio.toISOString(),
+            servico: 'Mão',
+            servicoId: 's1',
+            duracaoMin: 60,
+            pedidoId: 'p1',
+            travas: longe.travas,
+          },
+        ]),
+      );
+      renderizar();
+      expect(screen.queryByText(/Em instantes/)).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Pedir cancelamento' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Enviar pedido de cancelamento' }));
+      expect(pedirCancelamento).toHaveBeenCalledWith(CHAVE, 'p1', '');
     });
 
     it('com menos de 24 h, só pelo WhatsApp', () => {

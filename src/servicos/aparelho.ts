@@ -8,7 +8,15 @@ import { gerarChave } from '../dominio/portal';
 export type ClienteDoAparelho = { nome: string; whatsapp: string; chave?: string };
 
 /** Horários marcados por este aparelho e ainda não copiados pela manicure. */
-export type HorarioLocal = { inicio: string; servico: string; duracaoMin: number };
+export type HorarioLocal = {
+  inicio: string;
+  servico: string;
+  duracaoMin: number;
+  /** I14: pedido gravado por este aparelho e as travas dele (remarcar e cancelar na hora). */
+  pedidoId?: string;
+  servicoId?: string;
+  travas?: string[];
+};
 
 const CHAVE_CLIENTE = 'agenda-bela:cliente';
 const CHAVE_HORARIOS = 'agenda-bela:horarios';

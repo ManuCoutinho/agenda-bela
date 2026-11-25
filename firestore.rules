@@ -16,12 +16,24 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uidDaManicure() || request.auth.uid == uidService();
     }
 
-    // I14: o horário está em "Meus horários" da chave e faltam 24 h ou mais para ele
-    function horarioDaChave(chave, horario) {
+    // I14: o horário é da cliente desta chave e faltam 24 h ou mais para ele. Vale o que
+    // está em "Meus horários" (portal, gravado pela dona) ou o pedido que o próprio
+    // aparelho gravou (antes de a dona abrir o app e copiar para o portal).
+    function horarioDoPortal(chave, horario) {
       let portal = /databases/$(database)/documents/portal/$(chave);
       return exists(portal)
         && horario in get(portal).data.horarios
         && get(portal).data.horarios[horario].inicio > request.time + duration.value(24, 'h');
+    }
+    function pedidoDaChave(chave, horario) {
+      let pedido = /databases/$(database)/documents/pedidos/$(horario);
+      return exists(pedido)
+        && get(pedido).data.get('chave', '') == chave
+        && get(pedido).data.status in ['confirmado', 'aprovado']
+        && get(pedido).data.inicio > request.time + duration.value(24, 'h');
+    }
+    function horarioDaChave(chave, horario) {
+      return horarioDoPortal(chave, horario) || pedidoDaChave(chave, horario);
     }
 
     match /config/{doc} {
@@ -204,8 +216,13 @@ service cloud.firestore {
           && d.hora == resource.data.hora
           && d.expiraEm is timestamp && d.expiraEm <= request.time
           && d.liberadaPor is string && d.horario is string && d.pedidoNovo is string
-          && horarioDaChave(d.liberadaPor, d.horario)
-          && id in get(portal).data.horarios[d.horario].travas
+          && (
+            (horarioDoPortal(d.liberadaPor, d.horario)
+              && id in get(portal).data.horarios[d.horario].travas)
+            // pelo pedido: só a trava que é dele (o pedidoId fica na trava ao virar atendimento)
+            || (pedidoDaChave(d.liberadaPor, d.horario)
+              && resource.data.get('pedidoId', '') == d.horario
+              && id in get(/databases/$(database)/documents/pedidos/$(d.horario)).data.travas))
           && !exists(novo) && getAfter(novo) != null
           && getAfter(novo).data.get('substitui', '') == d.horario
           && getAfter(novo).data.get('chave', '') == d.liberadaPor;

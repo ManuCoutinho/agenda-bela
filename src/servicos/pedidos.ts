@@ -58,11 +58,14 @@ type DadosReserva = Pick<DadosPedido, 'nome' | 'whatsapp'> & {
   chave?: string;
 };
 
-export async function reservar(dados: DadosReserva): Promise<void> {
+/** Devolve o id do pedido (o aparelho guarda para remarcar e cancelar). */
+export async function reservar(dados: DadosReserva): Promise<string> {
   if (!navigator.onLine) throw new SemInternet();
+  const ref = doc(pedidos);
   const lote = writeBatch(db);
-  incluirReserva(lote, doc(pedidos), dados);
+  incluirReserva(lote, ref, dados);
   await gravarReserva(lote);
+  return ref.id;
 }
 
 /** Pedido confirmado e as travas definitivas dele, no lote. */
@@ -250,11 +253,28 @@ export async function aprovarPedido(
     // (horário fixo) caem na mesma cliente em vez de criar uma por data
     const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes, `wa-${pedido.whatsapp}`);
     const clienteExiste = clienteId ? true : (await tx.get(cliente)).exists();
+    // I14: a cliente pode ter remarcado um horário que ainda era só pedido (ela
+    // remarca pelo pedido antes de a dona abrir o app): `substitui` é o id dele
+    const antigoSnap = pedido.substitui ? await tx.get(doc(pedidos, pedido.substitui)) : null;
+    const antigoPedido = antigoSnap?.exists() ? antigoSnap.data() : null;
+    const moverAtendimento = !pedido.substitui
+      ? null
+      : !antigoPedido
+        ? pedido.substitui
+        : typeof antigoPedido.agendamentoId === 'string'
+          ? antigoPedido.agendamentoId
+          : null;
     const expirado = status === 'pendente' && pedidoExpirado(pedido, agora);
     const antigas = travasQueSaem(substitui, agora);
+    let foiRemarcado = false;
     for (const id of pedido.travas) {
       if (antigas.includes(id)) continue;
       const snap = await tx.get(doc(travas, id));
+      // a própria cliente soltou este horário ao remarcar: o pedido não vira atendimento
+      if (snap.data()?.horario === pedido.id && snap.data()?.liberadaPor) {
+        foiRemarcado = true;
+        continue;
+      }
       const expiraEm = snap.exists() ? paraData(snap.data().expiraEm) : undefined;
       // pedido confirmado (I08): a trava definitiva é dele; pendente: só dentro das 24 h
       const nossa =
@@ -262,10 +282,19 @@ export async function aprovarPedido(
         (!expirado && expiraEm !== null && expiraEm !== undefined);
       if (!nossa && !travaLivre(expiraEm, agora)) throw new HorarioOcupado();
     }
+    if (foiRemarcado) {
+      tx.update(doc(pedidos, pedido.id), {
+        status: 'recusado',
+        respondidoEm: serverTimestamp(),
+        avisadoEm: serverTimestamp(),
+      });
+      return;
+    }
 
     for (const id of pedido.travas) {
       const [data, hora] = id.split('_');
-      tx.set(doc(travas, id), { data, hora, expiraEm: null });
+      // o pedidoId fica na trava: a cliente pode remarcar pelo pedido (I14)
+      tx.set(doc(travas, id), { data, hora, expiraEm: null, pedidoId: pedido.id });
     }
     for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
       tx.delete(doc(travas, id));
@@ -274,8 +303,8 @@ export async function aprovarPedido(
     const atendimento =
       substitui?.tipo === 'agendamento'
         ? doc(agendamentos, substitui.agendamento.id)
-        : pedido.substitui
-          ? doc(agendamentos, pedido.substitui)
+        : moverAtendimento
+          ? doc(agendamentos, moverAtendimento)
           : doc(agendamentos);
     tx.update(doc(pedidos, pedido.id), {
       status: 'aprovado',
@@ -295,11 +324,11 @@ export async function aprovarPedido(
       ...(pedido.serieId ? { serieId: pedido.serieId } : {}),
       atualizadoEm: serverTimestamp(),
     };
-    if (substitui?.tipo === 'agendamento' || pedido.substitui) {
+    if (substitui?.tipo === 'agendamento' || moverAtendimento) {
       // o atendimento muda de horário: o lembrete do dia antigo não vale mais
       tx.update(atendimento, {
         ...dadosDoServico,
-        ...(pedido.substitui ? { status: 'marcado' } : {}),
+        ...(moverAtendimento ? { status: 'marcado' } : {}),
         lembreteEm: deleteField(),
         confirmacaoEm: deleteField(),
       });
@@ -309,6 +338,14 @@ export async function aprovarPedido(
       tx.update(doc(pedidos, substitui.pedido.id), {
         status: 'recusado',
         respondidoEm: serverTimestamp(),
+      });
+    }
+    // remarcou um horário que ainda não era atendimento: o pedido antigo sai
+    if (pedido.substitui && antigoPedido) {
+      tx.update(doc(pedidos, pedido.substitui), {
+        status: 'recusado',
+        respondidoEm: serverTimestamp(),
+        avisadoEm: serverTimestamp(),
       });
     }
 
@@ -393,7 +430,7 @@ export async function reservarSerie(
     travasDe: (data: string) => string[];
     chave?: string;
   },
-): Promise<{ reservadas: string[]; falhas: FalhaSerie[] }> {
+): Promise<{ serieId: string; reservadas: string[]; falhas: FalhaSerie[] }> {
   if (!navigator.onLine) throw new SemInternet();
   const serie = doc(collection(db, 'series'));
   const reservadas: string[] = [];
@@ -443,7 +480,7 @@ export async function reservarSerie(
       });
     }
   }
-  return { reservadas, falhas };
+  return { serieId: serie.id, reservadas, falhas };
 }
 
 /**
@@ -457,7 +494,7 @@ export async function remarcar(
     chave: string;
     antigo: { id: string; inicio: Date; travas: readonly string[] };
   },
-): Promise<void> {
+): Promise<string> {
   if (!navigator.onLine) throw new SemInternet();
   const ref = doc(pedidos);
   const lote = writeBatch(db);
@@ -477,6 +514,7 @@ export async function remarcar(
     });
   }
   await gravarReserva(lote);
+  return ref.id;
 }
 
 /** I14: a cliente pede para cancelar; a manicure aprova ou recusa. */
@@ -490,5 +528,21 @@ export async function pedirCancelamento(chave: string, horario: string, motivo: 
       ...(motivo.trim() ? { motivo: motivo.trim().slice(0, 200) } : {}),
       criadoEm: serverTimestamp(),
     }),
+  );
+}
+
+/** I14: atendimento criado a partir do pedido (`null` enquanto não virou atendimento). */
+export function observarAgendamentoDoPedido(
+  pedidoId: string,
+  aoMudar: (agendamentoId: string | null) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    doc(pedidos, pedidoId),
+    (snap) => {
+      const id: unknown = snap.data()?.agendamentoId;
+      aoMudar(typeof id === 'string' ? id : null);
+    },
+    aoFalhar,
   );
 }

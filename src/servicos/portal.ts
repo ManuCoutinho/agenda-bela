@@ -24,6 +24,7 @@ const paraPortal = (d: DocumentData): Portal => ({
       ...(typeof h.serieId === 'string' ? { serieId: h.serieId } : {}),
     }))
     .sort((a, b) => a.inicio.getTime() - b.inicio.getTime()),
+  copiados: Array.isArray(d.copiados) ? d.copiados.map(String) : [],
 });
 
 /** Página pública: lê só o documento da chave deste aparelho (1 leitura). */
@@ -55,6 +56,11 @@ export function salvarPortal(chave: string, dados: Portal) {
     ]),
   );
   gravarEmSegundoPlano(
-    setDoc(portal(chave), { whatsapp: dados.whatsapp, nome: dados.nome, horarios }),
+    setDoc(portal(chave), {
+      whatsapp: dados.whatsapp,
+      nome: dados.nome,
+      horarios,
+      copiados: dados.copiados ?? [],
+    }),
   );
 }

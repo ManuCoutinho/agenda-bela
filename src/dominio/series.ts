@@ -7,8 +7,8 @@ export type Repeticao = 0 | 7 | 14 | 28;
 export const REPETICOES: readonly { dias: Repeticao; rotulo: string }[] = [
   { dias: 0, rotulo: 'Não repetir' },
   { dias: 7, rotulo: 'Toda semana' },
-  { dias: 14, rotulo: 'A cada 2 semanas' },
-  { dias: 28, rotulo: 'A cada 4 semanas' },
+  { dias: 14, rotulo: 'Quinzenal' },
+  { dias: 28, rotulo: 'Mensal' },
 ];
 
 /** Horário fixo de uma cliente (`series/{id}`); a dona encerra quando ela parar de vir. */

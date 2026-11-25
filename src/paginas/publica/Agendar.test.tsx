@@ -118,6 +118,20 @@ describe('Página pública (RF08, RF09)', () => {
     );
   });
 
+  it('endereço que é link do mapa vira "Ver no mapa"', () => {
+    vi.mocked(usePaginaPublica).mockReturnValue({
+      pagina: { ...PAGINA, config: { ...PAGINA.config, endereco: 'https://share.google/abc' } },
+      carregando: false,
+      erro: false,
+    });
+    renderizar();
+    expect(screen.getByRole('link', { name: 'Ver no mapa' })).toHaveAttribute(
+      'href',
+      'https://share.google/abc',
+    );
+    expect(screen.queryByText('https://share.google/abc')).not.toBeInTheDocument();
+  });
+
   it('mostra só os serviços públicos, com duração e preço', () => {
     renderizar();
     expect(screen.getByRole('heading', { name: 'Espaço Juju' })).toBeInTheDocument();

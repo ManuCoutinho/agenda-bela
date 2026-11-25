@@ -638,7 +638,20 @@ function Moldura({
           )
         }
       />
-      {endereco && <p className="mb-4 text-texto-suave">{endereco}</p>}
+      {endereco &&
+        (/^https?:\/\//i.test(endereco.trim()) ? (
+          // link do mapa salvo como endereço: botão em vez do link cru
+          <a
+            href={endereco.trim()}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-4 inline-flex min-h-12 items-center text-marca underline underline-offset-4"
+          >
+            Ver no mapa
+          </a>
+        ) : (
+          <p className="mb-4 text-texto-suave">{endereco}</p>
+        ))}
       {children}
     </main>
   );

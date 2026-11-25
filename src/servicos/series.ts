@@ -1,3 +1,4 @@
+import { FirebaseError } from 'firebase/app';
 import {
   collection,
   doc,
@@ -34,6 +35,14 @@ const paraSerie = (id: string, d: DocumentData): Serie => ({
   ativa: d.ativa === true,
 });
 
+/** O servidor recusou a leitura: as regras desta versão ainda não foram publicadas. */
+export class SemPermissao extends Error {
+  constructor() {
+    super('Sem permissão no servidor');
+    this.name = 'SemPermissao';
+  }
+}
+
 /** Data de um horário fixo que não coube no mês aberto (bloqueio ou outro horário). */
 export type DataSemHorario = { serie: Serie; data: string };
 
@@ -48,7 +57,12 @@ export async function reservarSeriesNoMes(
   servicos: readonly Servico[],
   intervaloMin: number,
 ): Promise<DataSemHorario[]> {
-  const ativas = await getDocs(query(series, where('ativa', '==', true)));
+  const ativas = await getDocs(query(series, where('ativa', '==', true))).catch((erro: unknown) => {
+    if (erro instanceof FirebaseError && erro.code === 'permission-denied') {
+      throw new SemPermissao();
+    }
+    throw erro;
+  });
   const semHorario: DataSemHorario[] = [];
   for (const d of ativas.docs) {
     const serie = paraSerie(d.id, d.data());

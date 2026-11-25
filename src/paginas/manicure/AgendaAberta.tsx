@@ -10,7 +10,7 @@ import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useMesesAbertos } from '../../hooks/useMesesAbertos';
 import { useServicos } from '../../hooks/useServicos';
 import { salvarMesesAbertos } from '../../servicos/configPublica';
-import { reservarSeriesNoMes, type DataSemHorario } from '../../servicos/series';
+import { reservarSeriesNoMes, SemPermissao, type DataSemHorario } from '../../servicos/series';
 
 /**
  * I06: a manicure escolhe em quais meses as clientes podem pedir horário.
@@ -37,7 +37,11 @@ export default function AgendaAberta() {
       salvarMesesAbertos([...meses, mes]);
     } catch (e) {
       console.error(e);
-      setErroAbrir(`Não foi possível abrir ${rotuloMes(mes)}. Confira a internet e tente de novo.`);
+      setErroAbrir(
+        e instanceof SemPermissao
+          ? `Não foi possível abrir ${rotuloMes(mes)}: esta versão do app ainda não foi liberada no servidor. Avise quem cuida do app.`
+          : `Não foi possível abrir ${rotuloMes(mes)}. Confira a internet e tente de novo.`,
+      );
     } finally {
       setAbrindo(undefined);
     }

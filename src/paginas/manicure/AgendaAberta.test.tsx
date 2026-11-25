@@ -4,12 +4,15 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMesesAbertos } from '../../hooks/useMesesAbertos';
 import { salvarMesesAbertos } from '../../servicos/configPublica';
-import { reservarSeriesNoMes } from '../../servicos/series';
+import { reservarSeriesNoMes, SemPermissao } from '../../servicos/series';
 import AgendaAberta from './AgendaAberta';
 
 vi.mock('../../hooks/useMesesAbertos', () => ({ useMesesAbertos: vi.fn() }));
 vi.mock('../../servicos/configPublica', () => ({ salvarMesesAbertos: vi.fn() }));
-vi.mock('../../servicos/series', () => ({ reservarSeriesNoMes: vi.fn() }));
+vi.mock('../../servicos/series', () => ({
+  reservarSeriesNoMes: vi.fn(),
+  SemPermissao: class SemPermissao extends Error {},
+}));
 vi.mock('../../hooks/useServicos', () => ({
   useServicos: () => ({ servicos: [MAO], carregando: false, erro: false }),
 }));
@@ -88,5 +91,21 @@ describe('Agenda aberta (I06)', () => {
     renderizar();
     await userEvent.click(screen.getByRole('switch', { name: /novembro de 2026/ }));
     expect(salvarMesesAbertos).toHaveBeenCalledWith([]);
+  });
+});
+
+describe('Agenda aberta: servidor recusa (I06/I11)', () => {
+  it('não abre o mês e explica o que fazer, sem culpar a internet', async () => {
+    vi.useFakeTimers({ now: new Date('2026-11-24T15:00:00Z'), toFake: ['Date'] });
+    vi.mocked(salvarMesesAbertos).mockReset();
+    vi.mocked(reservarSeriesNoMes).mockReset().mockRejectedValue(new SemPermissao());
+    vi.mocked(useMesesAbertos).mockReturnValue({ meses: [202611], carregando: false, erro: false });
+    renderizar();
+    await userEvent.click(screen.getByRole('switch', { name: /dezembro de 2026/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'esta versão do app ainda não foi liberada no servidor',
+    );
+    expect(salvarMesesAbertos).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

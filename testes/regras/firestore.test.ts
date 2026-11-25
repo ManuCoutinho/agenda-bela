@@ -396,6 +396,12 @@ describe('horário fixo (I11)', () => {
     await assertFails(data('s5', ['2026-12-05_1000'], serie({ hora: '1030' })));
   });
 
+  it('manicure consulta as séries ativas (ao abrir um mês)', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await assertSucceeds(manicure().collection('series').where('ativa', '==', true).get());
+    await assertFails(visitante().collection('series').where('ativa', '==', true).get());
+  });
+
   it('visitante não lê séries; manicure lê e encerra', async () => {
     await data('s1', ['2026-12-05_1000'], serie());
     await assertFails(visitante().doc('series/s1').get());

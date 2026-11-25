@@ -1,4 +1,5 @@
 import { doc, onSnapshot, setDoc, type DocumentData } from 'firebase/firestore';
+import { mesesPadrao, mesesValidos, type Mes } from '../dominio/agendaAberta';
 import { CONFIGURACOES_PADRAO, type Configuracoes } from '../dominio/configuracoes';
 import type { Recorrente } from '../dominio/disponibilidade';
 import type { Servico } from '../dominio/servicos';
@@ -28,6 +29,7 @@ const paraConfiguracoes = (d: DocumentData | undefined): Configuracoes => {
     slug: texto(d?.slug, p.slug),
     whatsapp: texto(d?.whatsapp, p.whatsapp),
     endereco: texto(d?.endereco, p.endereco),
+    instagram: texto(d?.instagram, p.instagram),
     expediente: Array.isArray(d?.expediente)
       ? d.expediente.map((f: DocumentData) => ({
           dia: Number(f.dia),
@@ -37,7 +39,6 @@ const paraConfiguracoes = (d: DocumentData | undefined): Configuracoes => {
       : p.expediente,
     intervaloMin: numero(d?.intervaloMin, p.intervaloMin),
     antecedenciaMin: numero(d?.antecedenciaMin, p.antecedenciaMin),
-    janelaDias: numero(d?.janelaDias, p.janelaDias),
   };
 };
 
@@ -99,6 +100,7 @@ export type PaginaPublica = {
   servicos: Servico[];
   recorrentes: Recorrente[];
   pausa: Pausa;
+  mesesAbertos: Mes[];
 };
 
 export function observarPaginaPublica(
@@ -115,9 +117,32 @@ export function observarPaginaPublica(
               servicos: paraServicos(snap.data()),
               recorrentes: paraRecorrentes(snap.data()),
               pausa: paraPausa(snap.data()),
+              mesesAbertos: paraMesesAbertos(snap.data()),
             }
           : null,
       ),
     aoFalhar,
   );
+}
+
+/**
+ * I06: meses em que a cliente pode pedir. Antes de a manicure escolher, vale o
+ * mês atual e o seguinte (as regras, sem o campo, aceitam até 92 dias).
+ */
+const paraMesesAbertos = (d: DocumentData | undefined, agora = new Date()): Mes[] =>
+  Array.isArray(d?.mesesAbertos)
+    ? mesesValidos(d.mesesAbertos.map(Number), agora)
+    : mesesPadrao(agora);
+
+export function observarMesesAbertos(
+  aoMudar: (meses: Mes[]) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(configPublica, (snap) => aoMudar(paraMesesAbertos(snap.data())), aoFalhar);
+}
+
+/** Grava os meses abertos (sem os que já passaram); funciona offline. */
+export function salvarMesesAbertos(meses: readonly Mes[]) {
+  const mesesAbertos = mesesValidos(meses, new Date());
+  gravarEmSegundoPlano(setDoc(configPublica, { mesesAbertos }, { merge: true }));
 }

@@ -50,7 +50,8 @@ export const esquemaCliente = z.object({
 export type CamposCliente = z.input<typeof esquemaCliente>;
 /** O que é gravado: nome sem espaços sobrando, WhatsApp normalizado. */
 export type DadosCliente = z.output<typeof esquemaCliente>;
-export type Cliente = DadosCliente & { id: string };
+/** `chaves`: aparelhos em que ela marcou pela página ("Meus horários", I13). */
+export type Cliente = DadosCliente & { id: string; chaves?: string[] };
 
 const semAcento = (texto: string) =>
   texto

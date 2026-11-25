@@ -5,6 +5,9 @@ import { ContextoAuth, type EstadoAuth } from '../../hooks/contextoAuth';
 import LayoutManicure from './LayoutManicure';
 
 vi.mock('../../servicos/autenticacao', () => ({ sair: vi.fn() }));
+vi.mock('../../hooks/useMigracoes', () => ({ useMigracoes: vi.fn() }));
+vi.mock('../../hooks/useConversaoPedidos', () => ({ useConversaoPedidos: vi.fn() }));
+vi.mock('../../hooks/useSincronizarPortais', () => ({ useSincronizarPortais: vi.fn() }));
 
 function renderizar(estado: EstadoAuth) {
   return render(

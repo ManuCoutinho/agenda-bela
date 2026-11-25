@@ -68,7 +68,7 @@ describe('Configurações (RF04)', () => {
     await userEvent.selectOptions(screen.getByLabelText('Início (terça-feira)'), '13:00');
     await userEvent.selectOptions(
       screen.getByLabelText('Intervalo depois de cada atendimento'),
-      '30 min',
+      '1 h',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Salvar configurações' }));
 
@@ -77,7 +77,7 @@ describe('Configurações (RF04)', () => {
       nome: 'Espaço Juju',
       slug: 'espaco-juju',
       whatsapp: '5541988606636',
-      intervaloMin: 30,
+      intervaloMin: 60,
       expediente: [
         { dia: 0, ini: '09:00', fim: '12:00' },
         { dia: 1, ini: '09:00', fim: '18:00' },

@@ -40,6 +40,10 @@ const paraAgendamento = (id: string, d: DocumentData): Agendamento => ({
   sinalCentavos: typeof d.sinalCentavos === 'number' ? d.sinalCentavos : undefined,
   observacao: String(d.observacao ?? ''),
   lembreteEnviado: d.lembreteEm instanceof Timestamp,
+  pedidoId: typeof d.pedidoId === 'string' ? d.pedidoId : undefined,
+  serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
+  confirmacaoEnviadaEm: paraData(d.confirmacaoEm) ?? undefined,
+  sinalPedidoEm: paraData(d.sinalPedidoEm) ?? undefined,
 });
 
 /** Atendimentos com início em [de, ate), em ordem de horário. */
@@ -107,6 +111,33 @@ export function observarOcupados(
 }
 
 /**
+ * I07: horas ocupadas por dia entre `de` e `ate` (AAAA-MM-DD, inclusive), numa
+ * só consulta. A página pública lê só o mês que está na tela.
+ */
+export function observarOcupadosNoPeriodo(
+  de: string,
+  ate: string,
+  aoMudar: (porDia: Map<string, Set<string>>) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(travas, where('data', '>=', de), where('data', '<=', ate)),
+    (snap) => {
+      const agora = new Date();
+      const porDia = new Map<string, Set<string>>();
+      for (const d of snap.docs) {
+        const t = d.data();
+        if (travaLivre(paraData(t.expiraEm), agora)) continue;
+        const dia = String(t.data);
+        porDia.set(dia, (porDia.get(dia) ?? new Set()).add(String(t.hora)));
+      }
+      aoMudar(porDia);
+    },
+    aoFalhar,
+  );
+}
+
+/**
  * Marca (sem `id`) ou altera um atendimento numa transação: confere as travas
  * novas, confirma-as (`expiraEm: null`) e libera as que deixaram de ser usadas.
  * Lança `HorarioOcupado` se outra trava ativa estiver no caminho. Precisa de
@@ -165,5 +196,25 @@ export function marcarLembreteEnviado(id: string) {
 export function registrarResultado(id: string, status: 'realizado' | 'falta' | 'marcado') {
   gravarEmSegundoPlano(
     updateDoc(doc(agendamentos, id), { status, atualizadoEm: serverTimestamp() }),
+  );
+}
+
+/**
+ * I10: a confirmação foi enviada. Também tira da fila de avisos o pedido que
+ * originou o atendimento. Funciona offline.
+ */
+export function marcarConfirmacaoEnviada(agendamento: Pick<Agendamento, 'id' | 'pedidoId'>) {
+  const lote = writeBatch(db);
+  lote.update(doc(agendamentos, agendamento.id), { confirmacaoEm: serverTimestamp() });
+  if (agendamento.pedidoId) {
+    lote.update(doc(db, 'pedidos', agendamento.pedidoId), { avisadoEm: serverTimestamp() });
+  }
+  gravarEmSegundoPlano(lote.commit());
+}
+
+/** I10: sinal pedido pelo Pix (valor guardado para o painel). Funciona offline. */
+export function registrarSinalPedido(id: string, sinalCentavos: number) {
+  gravarEmSegundoPlano(
+    updateDoc(doc(agendamentos, id), { sinalCentavos, sinalPedidoEm: serverTimestamp() }),
   );
 }

@@ -3,18 +3,28 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HorarioOcupado, inicioEm, type Agendamento } from '../../dominio/agenda';
 import { CONFIGURACOES_PADRAO } from '../../dominio/configuracoes';
-import type { Pedido } from '../../dominio/pedidos';
+import type { AvisoPendente, Pedido } from '../../dominio/pedidos';
 import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { usePagamento } from '../../hooks/usePagamento';
-import { useAgendamentosDasClientes, usePedidosPendentes } from '../../hooks/usePedidos';
+import {
+  useAgendamentosDasClientes,
+  useAvisosPendentes,
+  usePedidosPendentes,
+} from '../../hooks/usePedidos';
 import { useServicos } from '../../hooks/useServicos';
-import { aprovarPedido, descartarPedido, recusarPedido } from '../../servicos/pedidos';
+import {
+  aprovarPedido,
+  descartarPedido,
+  marcarAvisado,
+  recusarPedido,
+} from '../../servicos/pedidos';
 import PedidosPendentes from './PedidosPendentes';
 
 vi.mock('../../hooks/usePedidos', () => ({
   usePedidosPendentes: vi.fn(),
   useAgendamentosDasClientes: vi.fn(),
+  useAvisosPendentes: vi.fn(),
 }));
 vi.mock('../../hooks/useServicos', () => ({ useServicos: vi.fn() }));
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
@@ -24,6 +34,7 @@ vi.mock('../../servicos/pedidos', () => ({
   aprovarPedido: vi.fn(),
   recusarPedido: vi.fn(),
   descartarPedido: vi.fn(),
+  marcarAvisado: vi.fn(),
 }));
 
 const AGORA = new Date('2026-11-20T12:00:00Z');
@@ -50,6 +61,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       erro: false,
     });
     vi.mocked(useAgendamentosDasClientes).mockReturnValue([]);
+    vi.mocked(useAvisosPendentes).mockReturnValue({ avisos: [], carregando: false, erro: false });
     vi.mocked(usePagamento).mockReturnValue({
       pagamento: { chavePix: '', sinalPercentual: 50 },
       carregando: false,
@@ -79,31 +91,108 @@ describe('Pedidos para responder (RF10, RN02)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('aprova usando a cliente já cadastrada e oferece a confirmação no WhatsApp', async () => {
+  it('aprova usando a cliente já cadastrada e grava a confirmação a enviar', async () => {
     vi.mocked(aprovarPedido).mockResolvedValue();
     render(<PedidosPendentes />);
     expect(screen.getByRole('heading', { name: 'Pedidos para responder (1)' })).toBeInTheDocument();
     expect(screen.getByText('terça-feira, 1 de dezembro, às 09:00')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
-    expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, { clienteId: 'c1' });
-    expect(await screen.findByRole('status')).toHaveTextContent('Ana: aprovado');
-    const link = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
-    expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
-      'Seu horário de Mão está confirmado para terça-feira, 1 de dezembro, às 09:00. Endereço: Rua A, 1.',
-    );
+    expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
+      clienteId: 'c1',
+      aviso: {
+        tipo: 'confirmacao',
+        texto: expect.stringContaining(
+          'Seu horário de Mão está confirmado para terça-feira, 1 de dezembro, às 09:00. Endereço: Rua A, 1.',
+        ),
+      },
+    });
   });
 
-  it('recusa só depois de confirmar e manda o link da página', async () => {
+  it('recusa só depois de confirmar e grava o aviso com o link da página', async () => {
     render(<PedidosPendentes />);
     await userEvent.click(screen.getByRole('button', { name: 'Recusar' }));
     expect(recusarPedido).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Sim, recusar' }));
-    expect(recusarPedido).toHaveBeenCalledWith(PEDIDO);
-    const link = screen.getByRole('link', { name: 'Enviar aviso no WhatsApp' });
-    expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
-      `${window.location.origin}/agendar/espaco-juju`,
+    expect(recusarPedido).toHaveBeenCalledWith(
+      PEDIDO,
+      expect.stringContaining(`${window.location.origin}/agendar/espaco-juju`),
     );
+  });
+
+  describe('avisos para enviar (lidos do Firestore)', () => {
+    const aviso = (pedidoId: string, nome: string): AvisoPendente => ({
+      pedidoId,
+      nome,
+      whatsapp: PEDIDO.whatsapp,
+      inicio: PEDIDO.inicio,
+      tipo: 'confirmacao',
+      texto: `Oi, ${nome}! Seu horário está confirmado.`,
+    });
+    const FILA = [aviso('p1', 'Ana'), aviso('p2', 'Bia'), aviso('p3', 'Cris')];
+
+    beforeEach(() => {
+      vi.mocked(marcarAvisado).mockReset();
+      vi.mocked(usePedidosPendentes).mockReturnValue({
+        pedidos: [],
+        carregando: false,
+        erro: false,
+      });
+      vi.mocked(useAvisosPendentes).mockReturnValue({
+        avisos: FILA,
+        carregando: false,
+        erro: false,
+      });
+    });
+
+    it('mostra cada aviso com a mensagem pronta, sem a lista de pedidos vazia', () => {
+      render(<PedidosPendentes />);
+      expect(screen.getByRole('heading', { name: 'Avisos para enviar (3)' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Pedidos para responder/ })).toBeNull();
+      const [primeiro] = screen.getAllByRole('link', { name: 'Enviar confirmação no WhatsApp' });
+      expect(decodeURIComponent(primeiro?.getAttribute('href') ?? '')).toContain(
+        'Oi, Ana! Seu horário está confirmado.',
+      );
+    });
+
+    it('enviar o primeiro só tira ele da fila; os outros continuam depois de reabrir o app', async () => {
+      const { unmount } = render(<PedidosPendentes />);
+      const [primeiro] = screen.getAllByRole('link', { name: 'Enviar confirmação no WhatsApp' });
+      primeiro?.addEventListener('click', (e) => e.preventDefault());
+      if (primeiro) await userEvent.click(primeiro);
+      expect(marcarAvisado).toHaveBeenCalledTimes(1);
+      expect(marcarAvisado).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p1' }));
+
+      // o WhatsApp abriu e o app recarregou: a fila vem de novo do Firestore
+      unmount();
+      vi.mocked(useAvisosPendentes).mockReturnValue({
+        avisos: FILA.slice(1),
+        carregando: false,
+        erro: false,
+      });
+      render(<PedidosPendentes />);
+      expect(screen.getByRole('heading', { name: 'Avisos para enviar (2)' })).toBeInTheDocument();
+      expect(screen.getByText(/^Bia:/)).toBeInTheDocument();
+      expect(screen.getByText(/^Cris:/)).toBeInTheDocument();
+    });
+
+    it('"Já avisei" tira o aviso sem abrir o WhatsApp', async () => {
+      render(<PedidosPendentes />);
+      const [, segundo] = screen.getAllByRole('button', { name: 'Já avisei' });
+      if (segundo) await userEvent.click(segundo);
+      expect(marcarAvisado).toHaveBeenCalledWith(expect.objectContaining({ pedidoId: 'p2' }));
+    });
+
+    it('recusa aparece como aviso, não como confirmação', () => {
+      vi.mocked(useAvisosPendentes).mockReturnValue({
+        avisos: [{ ...aviso('p1', 'Ana'), tipo: 'recusa' }],
+        carregando: false,
+        erro: false,
+      });
+      render(<PedidosPendentes />);
+      expect(screen.getByText('Ana: recusado e horário liberado. Avise a cliente:')).toBeVisible();
+      expect(screen.getByRole('link', { name: 'Enviar aviso no WhatsApp' })).toBeInTheDocument();
+    });
   });
 
   it('pedido expirado: avisa, deixa descartar e explica se o horário foi ocupado', async () => {
@@ -157,20 +246,23 @@ describe('Pedidos para responder (RF10, RN02)', () => {
           tipo: 'agendamento',
           agendamento: MARCADO,
         },
+        aviso: {
+          tipo: 'troca',
+          texto: expect.stringContaining(
+            'Troquei o seu horário: o de sábado, 28 de novembro, às 10:00 passou para ' +
+              'terça-feira, 1 de dezembro, às 09:00 (Mão).',
+          ),
+        },
       });
-      expect(await screen.findByRole('status')).toHaveTextContent('Ana: horário trocado na agenda');
-      const link = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
-      expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
-        'Troquei o seu horário: o de sábado, 28 de novembro, às 10:00 passou para ' +
-          'terça-feira, 1 de dezembro, às 09:00 (Mão).',
-      );
     });
 
     it('"Marcar mais um" aprova sem mexer no horário que ela já tem', async () => {
       render(<PedidosPendentes />);
       await userEvent.click(screen.getByRole('button', { name: 'Marcar mais um' }));
-      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, { clienteId: 'c1' });
-      expect(await screen.findByRole('status')).toHaveTextContent('Ana: aprovado');
+      expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
+        clienteId: 'c1',
+        aviso: expect.objectContaining({ tipo: 'confirmacao' }),
+      });
     });
 
     it('dois pedidos sem resposta do mesmo número: a troca substitui o outro pedido', async () => {
@@ -193,6 +285,7 @@ describe('Pedidos para responder (RF10, RN02)', () => {
           tipo: 'pedido',
           pedido: anterior,
         },
+        aviso: expect.objectContaining({ tipo: 'troca' }),
       });
     });
   });
@@ -229,11 +322,13 @@ describe('Pedidos para responder (RF10, RN02)', () => {
       expect(aprovarPedido).toHaveBeenCalledWith(PEDIDO, MAO, {
         clienteId: 'c1',
         sinalCentavos: 1750,
+        aviso: {
+          tipo: 'confirmacao',
+          texto: expect.stringContaining(
+            'peço um sinal de R$ 17,50 (50% do valor) pelo Pix. Chave: ana@pix.com.',
+          ),
+        },
       });
-      const link = await screen.findByRole('link', { name: 'Enviar confirmação no WhatsApp' });
-      expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
-        'peço um sinal de R$ 17,50 (50% do valor) pelo Pix. Chave: ana@pix.com.',
-      );
     });
   });
 });

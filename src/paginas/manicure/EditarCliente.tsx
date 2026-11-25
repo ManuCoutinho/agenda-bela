@@ -6,6 +6,7 @@ import { ESTILO_LINK } from '../../componentes/estilos';
 import { formatarWhatsApp, type DadosCliente } from '../../dominio/clientes';
 import { useClientes } from '../../hooks/useClientes';
 import { salvarCliente } from '../../servicos/clientes';
+import ProximoHorarioCliente from './ProximoHorarioCliente';
 
 /** `/clientes/nova` cadastra; `/clientes/:id` edita. */
 export default function EditarCliente() {
@@ -42,6 +43,7 @@ export default function EditarCliente() {
   return (
     <>
       <BarraSuperior titulo={titulo} voltarPara="/clientes" />
+      {cliente && <ProximoHorarioCliente whatsapp={cliente.whatsapp} />}
       <FormularioCliente
         key={cliente?.id ?? 'nova'}
         inicial={

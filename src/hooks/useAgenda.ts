@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { inicioEm, somarDias, type Agendamento } from '../dominio/agenda';
-import { observarAgendamento, observarAgendamentos, observarOcupados } from '../servicos/agenda';
+import {
+  observarAgendamento,
+  observarAgendamentos,
+  observarOcupados,
+  observarOcupadosNoPeriodo,
+} from '../servicos/agenda';
 
 /**
  * Resultado guardado junto com a chave da consulta que o produziu: quando a
@@ -76,4 +81,29 @@ export function useOcupados(data: string) {
 
   if (!valida) return { dados: NENHUM_OCUPADO, carregando: false, erro: false };
   return derivar(r, data, NENHUM_OCUPADO);
+}
+
+const NENHUM_DIA: ReadonlyMap<string, ReadonlySet<string>> = new Map();
+
+/**
+ * Horas ocupadas por dia entre `de` e `ate` (AAAA-MM-DD). Sem período, não
+ * consulta nada. Voltar a um mês visto há pouco custa só o que mudou nele
+ * (o Firestore retoma a escuta).
+ */
+export function useOcupadosNoPeriodo(de: string, ate: string) {
+  const chave = de && ate ? `${de}..${ate}` : '';
+  const [r, setR] = useState<Resultado<ReadonlyMap<string, ReadonlySet<string>>> | null>(null);
+
+  useEffect(() => {
+    if (!chave) return;
+    return observarOcupadosNoPeriodo(
+      de,
+      ate,
+      (dados) => setR({ chave, dados, erro: false }),
+      aoFalhar(chave, NENHUM_DIA, setR),
+    );
+  }, [chave, de, ate]);
+
+  if (!chave) return { dados: NENHUM_DIA, carregando: false, erro: false };
+  return derivar(r, chave, NENHUM_DIA);
 }

@@ -7,6 +7,7 @@ import {
   gerarSlug,
   paraCampos,
   paraConfiguracoes,
+  usuarioInstagram,
   type CamposConfiguracoes,
 } from './configuracoes';
 
@@ -47,10 +48,17 @@ describe('esquemaConfiguracoes (RF04)', () => {
   });
 
   it('normaliza o WhatsApp e converte os dias abertos em faixas', () => {
-    const config = paraConfiguracoes(esquemaConfiguracoes.parse(campos({ intervaloMin: '30' })));
+    const config = paraConfiguracoes(esquemaConfiguracoes.parse(campos({ intervaloMin: '60' })));
     expect(config.whatsapp).toBe('5541988606636');
-    expect(config.intervaloMin).toBe(30);
+    expect(config.intervaloMin).toBe(60);
     expect(config.expediente).toEqual(CONFIGURACOES_PADRAO.expediente);
+    expect(mensagens(campos({ intervaloMin: '30' }))).toEqual([
+      'intervaloMin: Escolha uma opção da lista.',
+    ]);
+  });
+
+  it('intervalo antigo de 30 min aparece como 1 h (já reservava a hora seguinte)', () => {
+    expect(paraCampos({ ...CONFIGURACOES_PADRAO, intervaloMin: 30 }).intervaloMin).toBe('60');
   });
 
   it('volta ao formulário com os mesmos valores (ida e volta)', () => {
@@ -84,8 +92,8 @@ describe('esquemaConfiguracoes (RF04)', () => {
   });
 
   it('recusa valor fora das listas', () => {
-    expect(mensagens(campos({ janelaDias: '45' }))).toEqual([
-      'janelaDias: Escolha uma opção da lista.',
+    expect(mensagens(campos({ antecedenciaMin: '45' }))).toEqual([
+      'antecedenciaMin: Escolha uma opção da lista.',
     ]);
   });
 });
@@ -96,5 +104,32 @@ describe('expedienteDoDia', () => {
       { ini: '09:00', fim: '18:00' },
     ]);
     expect(expedienteDoDia(CONFIGURACOES_PADRAO.expediente, 0)).toEqual([]);
+  });
+});
+
+describe('usuarioInstagram', () => {
+  it.each([
+    ['@EspacoJuju', 'espacojuju'],
+    ['espaco.juju_', 'espaco.juju_'],
+    ['https://www.instagram.com/espacojuju/?hl=pt', 'espacojuju'],
+    ['instagram.com/espacojuju', 'espacojuju'],
+    ['  ', ''],
+  ])('%s → %s', (texto, usuario) => {
+    expect(usuarioInstagram(texto)).toBe(usuario);
+  });
+
+  it('recusa o que não é usuário', () => {
+    expect(usuarioInstagram('espaço juju')).toBeNull();
+    expect(mensagens(campos({ instagram: 'espaço juju' }))).toEqual([
+      'instagram: Escreva o seu @ do Instagram, por exemplo @espacojuju.',
+    ]);
+  });
+
+  it('o formulário mostra com @ e grava sem', () => {
+    const config = { ...CONFIGURACOES_PADRAO, instagram: 'espacojuju' };
+    expect(paraCampos(config).instagram).toBe('@espacojuju');
+    expect(
+      paraConfiguracoes(esquemaConfiguracoes.parse(campos({ instagram: '@espacojuju' }))).instagram,
+    ).toBe('espacojuju');
   });
 });

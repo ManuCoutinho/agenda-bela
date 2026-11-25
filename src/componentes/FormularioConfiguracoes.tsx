@@ -7,7 +7,6 @@ import {
   formatarAntecedencia,
   HORAS_EXPEDIENTE,
   INTERVALOS_MIN,
-  JANELAS_DIAS,
   type CamposConfiguracoes,
   type DadosConfiguracoes,
 } from '../dominio/configuracoes';
@@ -69,6 +68,23 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
           erro={errors.endereco?.message}
         >
           {(a) => <textarea {...a} {...register('endereco')} rows={2} className={ESTILO_CAMPO} />}
+        </Campo>
+        <Campo
+          id="instagram"
+          rotulo="Instagram (opcional)"
+          dica="Ex.: @espacojuju. Aparece na página de agendamento para a cliente ver seus trabalhos."
+          erro={errors.instagram?.message}
+        >
+          {(a) => (
+            <input
+              {...a}
+              {...register('instagram')}
+              type="text"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className={ESTILO_CAMPO}
+            />
+          )}
         </Campo>
       </fieldset>
 
@@ -163,21 +179,6 @@ export default function FormularioConfiguracoes({ inicial, aoEnviar, aoCancelar 
               {ANTECEDENCIAS_MIN.map((m) => (
                 <option key={m} value={String(m)}>
                   {formatarAntecedencia(m)}
-                </option>
-              ))}
-            </select>
-          )}
-        </Campo>
-        <Campo
-          id="janela"
-          rotulo="Até quantos dias à frente a cliente pode pedir"
-          erro={errors.janelaDias?.message}
-        >
-          {(a) => (
-            <select {...a} {...register('janelaDias')} className={ESTILO_CAMPO}>
-              {JANELAS_DIAS.map((d) => (
-                <option key={d} value={String(d)}>
-                  {d} dias
                 </option>
               ))}
             </select>

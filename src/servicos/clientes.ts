@@ -19,6 +19,7 @@ const paraCliente = (id: string, d: DocumentData): Cliente => ({
   whatsapp: String(d.whatsapp ?? ''),
   observacao: String(d.observacao ?? ''),
   consentimento: true,
+  ...(Array.isArray(d.chaves) ? { chaves: d.chaves.map(String) } : {}),
 });
 
 /** Acompanha a lista de clientes; devolve a função que para de acompanhar. */

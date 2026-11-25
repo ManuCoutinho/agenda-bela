@@ -4,6 +4,7 @@ import Carregando from './componentes/Carregando';
 import PaginaNaoEncontrada from './paginas/PaginaNaoEncontrada';
 import Bloqueios from './paginas/manicure/Bloqueios';
 import Clientes from './paginas/manicure/Clientes';
+import AgendaAberta from './paginas/manicure/AgendaAberta';
 import Configuracoes from './paginas/manicure/Configuracoes';
 import EditarAtendimento from './paginas/manicure/EditarAtendimento';
 import EditarBloqueio from './paginas/manicure/EditarBloqueio';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="mais" element={<Mais />} />
         <Route path="mais/instalar" element={<Instalar />} />
         <Route path="mais/painel" element={<Painel />} />
+        <Route path="mais/agenda-aberta" element={<AgendaAberta />} />
         <Route path="mais/configuracoes" element={<Configuracoes />} />
         <Route path="mais/servicos" element={<Servicos />} />
         <Route path="mais/servicos/novo" element={<EditarServico />} />

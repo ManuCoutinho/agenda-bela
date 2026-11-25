@@ -164,6 +164,11 @@ describe('pedidos (HU03)', () => {
     await assertSucceeds(reservar(['2026-12-01_0900', '2026-12-01_0930']));
   });
 
+  it('I02: aceita o maior pedido da página (5 h + 1 h de intervalo = 6 travas de 1 h)', async () => {
+    const ids = ['09', '10', '11', '12', '13', '14'].map((h) => `2026-12-01_${h}00`);
+    await assertSucceeds(reservar(ids));
+  });
+
   it('segunda cliente no mesmo horário é recusada e nada é gravado', async () => {
     await reservar(['2026-12-01_0900', '2026-12-01_0930']);
     await assertFails(reservar(['2026-12-01_0930', '2026-12-01_1000']));
@@ -229,9 +234,440 @@ describe('pedidos (HU03)', () => {
     await assertSucceeds(reservar(['2026-12-01_0900']));
   });
 
+  it('I06: só aceita pedido nos meses abertos, no horário de Brasília', async () => {
+    const base = new Date(Date.now() + 30 * 24 * HORA);
+    const ano = base.getUTCFullYear();
+    const mes = base.getUTCMonth();
+    // 01:00 UTC do dia 1 = 22:00 do último dia do mês anterior em São Paulo
+    const virada = Timestamp.fromDate(new Date(Date.UTC(ano, mes + 1, 1, 1)));
+    const mesEmSP = ano * 100 + mes + 1;
+    const seguinte = mes === 11 ? (ano + 1) * 100 + 1 : mesEmSP + 1;
+    const abrir = (mesesAbertos: number[]) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        ctx.firestore().doc('config/publico').set({ mesesAbertos }),
+      );
+    const ids = ['2026-12-01_0900'];
+
+    await abrir([seguinte]);
+    await assertFails(reservar(ids, pedido(ids, { inicio: virada })));
+    await abrir([mesEmSP]);
+    await assertSucceeds(reservar(ids, pedido(ids, { inicio: virada })));
+  });
+
   it('visitante não lê pedidos; manicure lê', async () => {
     await reservar(['2026-12-01_0900']);
     await assertFails(visitante().collection('pedidos').get());
     await assertSucceeds(manicure().collection('pedidos').get());
   });
+});
+
+describe('confirmação automática (I08)', () => {
+  /** Simula `reservar` atual: pedido confirmado e travas definitivas dele, no mesmo lote. */
+  function confirmar(ids: string[], extra: Record<string, unknown> = {}, travaExtra = {}) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of ids) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: null,
+        pedidoId: ref.id,
+        ...travaExtra,
+      });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', ...extra }));
+    return { ref, commit: () => lote.commit() };
+  }
+
+  it('cliente confirma na hora: pedido confirmado e travas definitivas', async () => {
+    const { commit } = confirmar(['2026-12-01_0900', '2026-12-01_1000']);
+    await assertSucceeds(commit());
+    const t = await manicure().doc('travas/2026-12-01_0900').get();
+    expect(t.data()?.expiraEm).toBeNull();
+  });
+
+  it('segunda cliente no mesmo horário é recusada', async () => {
+    await confirmar(['2026-12-01_0900']).commit();
+    await assertFails(confirmar(['2026-12-01_0900']).commit());
+    await assertFails(reservar(['2026-12-01_0900']));
+  });
+
+  it('trava definitiva sem o pedido no mesmo lote é recusada', async () => {
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null, pedidoId: 'p1' }),
+    );
+  });
+
+  it('trava definitiva sem pedidoId é recusada', async () => {
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null }),
+    );
+  });
+
+  it('pedido confirmado com trava de outro horário não serve', async () => {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    lote.set(db.doc('travas/2026-12-01_0900'), {
+      data: '2026-12-01',
+      hora: '0900',
+      expiraEm: null,
+      pedidoId: ref.id,
+    });
+    lote.set(ref, pedido(['2026-12-01_1000'], { status: 'confirmado' }));
+    await assertFails(lote.commit());
+  });
+
+  it('não prende de novo um horário cancelado usando um pedido antigo', async () => {
+    const { ref, commit } = confirmar(['2026-12-01_0900']);
+    await commit();
+    await manicure().doc('travas/2026-12-01_0900').delete(); // manicure cancelou
+    await assertFails(
+      visitante()
+        .doc('travas/2026-12-01_0900')
+        .set({ data: '2026-12-01', hora: '0900', expiraEm: null, pedidoId: ref.id }),
+    );
+  });
+
+  it('pedido confirmado também respeita mês aberto e pausa', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx
+        .firestore()
+        .doc('config/publico')
+        .set({ pausa: { ativa: true, aviso: '' } }),
+    );
+    await assertFails(confirmar(['2026-12-01_0900']).commit());
+  });
+});
+
+describe('horário fixo (I11)', () => {
+  const serie = (extra: Record<string, unknown> = {}) => ({
+    nome: 'Ana',
+    whatsapp: '5511987654321',
+    servicoId: 'alongamento',
+    hora: '1000',
+    frequenciaDias: 7,
+    primeiraData: '2026-12-05',
+    ativa: true,
+    criadoEm: serverTimestamp(),
+    ...extra,
+  });
+
+  /** Uma data da série: pedido confirmado + travas; a série vai junto na primeira. */
+  function data(serieId: string, ids: string[], comSerie: Record<string, unknown> | null) {
+    const db = visitante();
+    const ref = db.doc(`pedidos/${serieId}_${ids[0]?.slice(0, 10)}`);
+    const lote = db.batch();
+    if (comSerie) lote.set(db.doc(`series/${serieId}`), comSerie);
+    for (const id of ids) {
+      const [d, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data: d, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', serieId }));
+    return lote.commit();
+  }
+
+  it('grava a série com a primeira data e as outras datas em lotes separados', async () => {
+    await assertSucceeds(data('s1', ['2026-12-05_1000'], serie()));
+    await assertSucceeds(data('s1', ['2026-12-12_1000'], null));
+  });
+
+  it('uma data ocupada falha sozinha; as outras seguem', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await confirmarAvulso('2026-12-12_1000');
+    await assertFails(data('s1', ['2026-12-12_1000'], null));
+    await assertSucceeds(data('s1', ['2026-12-19_1000'], null));
+  });
+
+  it('pedido com série que não existe ou de outro WhatsApp é recusado', async () => {
+    await assertFails(data('nao-existe', ['2026-12-05_1000'], null));
+    await assertFails(data('s2', ['2026-12-05_1000'], serie({ whatsapp: '5511900000000' })));
+  });
+
+  it('série com campos inválidos é recusada', async () => {
+    await assertFails(data('s3', ['2026-12-05_1000'], serie({ frequenciaDias: 3 })));
+    await assertFails(data('s4', ['2026-12-05_1000'], serie({ ativa: false })));
+    await assertFails(data('s5', ['2026-12-05_1000'], serie({ hora: '1030' })));
+  });
+
+  it('manicure consulta as séries ativas (ao abrir um mês)', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await assertSucceeds(manicure().collection('series').where('ativa', '==', true).get());
+    await assertFails(visitante().collection('series').where('ativa', '==', true).get());
+  });
+
+  it('visitante não lê séries; manicure lê e encerra', async () => {
+    await data('s1', ['2026-12-05_1000'], serie());
+    await assertFails(visitante().doc('series/s1').get());
+    await assertSucceeds(manicure().doc('series/s1').update({ ativa: false }));
+  });
+
+  async function confirmarAvulso(id: string) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const [d, hora] = id.split('_');
+    const lote = db.batch();
+    lote.set(db.doc(`travas/${id}`), { data: d, hora, expiraEm: null, pedidoId: ref.id });
+    lote.set(ref, pedido([id], { status: 'confirmado' }));
+    await lote.commit();
+  }
+});
+
+describe('"Meus horários" (I13)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+
+  it('quem tem a chave lê o portal; ninguém lista; só a manicure grava', async () => {
+    await manicure().doc(`portal/${CHAVE}`).set({ whatsapp: '5511987654321', horarios: {} });
+    await assertSucceeds(visitante().doc(`portal/${CHAVE}`).get());
+    await assertFails(visitante().collection('portal').get());
+    await assertFails(visitante().doc(`portal/${CHAVE}`).set({ horarios: {} }));
+    await assertFails(visitante().doc('portal/outra-chave-qualquer-aaa').set({ horarios: {} }));
+  });
+
+  it('pedido leva a chave do aparelho; chave fora do formato é recusada', async () => {
+    const ids = ['2026-12-01_0900'];
+    await assertSucceeds(reservar(ids, pedido(ids, { chave: CHAVE })));
+    const outras = ['2026-12-02_0900'];
+    await assertFails(reservar(outras, pedido(outras, { chave: 'curta' })));
+    await assertFails(reservar(outras, pedido(outras, { chave: `${CHAVE}/../x` })));
+  });
+});
+
+describe('remarcar e pedir cancelamento (I14)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+  const ANTIGO = ['2026-12-01_0900', '2026-12-01_1000'];
+
+  /** Horário da cliente: travas definitivas e o portal dela (como o app da dona grava). */
+  async function horarioDaCliente(horasAteLa = 72) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const id of ANTIGO) {
+        const [data, hora] = id.split('_');
+        await db.doc(`travas/${id}`).set({ data, hora, expiraEm: null });
+      }
+      await db.doc(`portal/${CHAVE}`).set({
+        whatsapp: '5511987654321',
+        nome: 'Ana',
+        horarios: { a1: { inicio: daqui(horasAteLa), servico: 'Mão', travas: ANTIGO } },
+      });
+    });
+  }
+
+  /** Remarcação: pedido novo que substitui a1 + travas novas + solta as antigas. */
+  function remarcar(novas: string[], soltar = ANTIGO, extra: Record<string, unknown> = {}) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of novas) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    for (const id of soltar) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: CHAVE,
+        horario: 'a1',
+        pedidoNovo: ref.id,
+      });
+    }
+    lote.set(
+      ref,
+      pedido(novas, {
+        status: 'confirmado',
+        chave: CHAVE,
+        substitui: 'a1',
+        substituiInicio: daqui(72),
+        ...extra,
+      }),
+    );
+    return lote.commit();
+  }
+
+  it('remarca na hora: o horário novo fica dela e o antigo volta a ficar livre', async () => {
+    await horarioDaCliente();
+    await assertSucceeds(remarcar(['2026-12-03_1400', '2026-12-03_1500']));
+    await assertSucceeds(reservar(['2026-12-01_0900'])); // outra cliente pega o antigo
+  });
+
+  it('com menos de 24 h, não remarca', async () => {
+    await horarioDaCliente(12);
+    await assertFails(remarcar(['2026-12-03_1400']));
+  });
+
+  it('não solta trava sem marcar o horário novo (seria cancelar sem aprovação)', async () => {
+    await horarioDaCliente();
+    const db = visitante();
+    await assertFails(
+      db.doc('travas/2026-12-01_0900').set({
+        data: '2026-12-01',
+        hora: '0900',
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: CHAVE,
+        horario: 'a1',
+        pedidoNovo: 'qualquer',
+      }),
+    );
+  });
+
+  it('não solta trava que não é do horário dela', async () => {
+    await horarioDaCliente();
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc('travas/2026-12-02_0900').set({
+        data: '2026-12-02',
+        hora: '0900',
+        expiraEm: null,
+      }),
+    );
+    await assertFails(remarcar(['2026-12-03_1400'], ['2026-12-02_0900']));
+  });
+
+  it('chave errada não remarca', async () => {
+    await horarioDaCliente();
+    await assertFails(remarcar(['2026-12-03_1400'], ANTIGO, { chave: 'outraChaveQualquer12345' }));
+  });
+
+  it('pede cancelamento do próprio horário, com 24 h ou mais', async () => {
+    await horarioDaCliente();
+    const pedirCancelamento = (horario: string, chave = CHAVE) =>
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave,
+        horario,
+        motivo: 'Viagem',
+        criadoEm: serverTimestamp(),
+      });
+    await assertSucceeds(pedirCancelamento('a1'));
+    await assertFails(pedirCancelamento('a2'));
+    await assertFails(pedirCancelamento('a1', 'outraChaveQualquer12345'));
+    await assertFails(visitante().collection('solicitacoes').get());
+  });
+
+  it('com menos de 24 h, não pede cancelamento', async () => {
+    await horarioDaCliente(12);
+    await assertFails(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: 'a1',
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+});
+
+describe('remarcar e cancelar antes de a dona abrir o app (I14, pelo pedido)', () => {
+  const CHAVE = 'k7Q2abcdefghijklmnop';
+
+  /** Cliente marca pela página: pedido confirmado com a chave + travas com pedidoId. */
+  async function marcar(ids: string[], horas = 72) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of ids) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    lote.set(ref, pedido(ids, { status: 'confirmado', chave: CHAVE, inicio: daqui(horas) }));
+    await lote.commit();
+    return ref.id;
+  }
+
+  function remarcarPedido(antigo: string, soltar: string[], novas: string[], chave = CHAVE) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const lote = db.batch();
+    for (const id of novas) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    }
+    for (const id of soltar) {
+      const [data, hora] = id.split('_');
+      lote.set(db.doc(`travas/${id}`), {
+        data,
+        hora,
+        expiraEm: Timestamp.fromMillis(0),
+        liberadaPor: chave,
+        horario: antigo,
+        pedidoNovo: ref.id,
+      });
+    }
+    lote.set(
+      ref,
+      pedido(novas, {
+        status: 'confirmado',
+        chave,
+        substitui: antigo,
+        substituiInicio: daqui(72),
+      }),
+    );
+    return lote.commit();
+  }
+
+  it('remarca um horário recém-marcado, sem portal', async () => {
+    const antigo = await marcar(['2026-12-01_0900', '2026-12-01_1000']);
+    await assertSucceeds(
+      remarcarPedido(antigo, ['2026-12-01_0900', '2026-12-01_1000'], ['2026-12-03_1400']),
+    );
+  });
+
+  it('o maior serviço (3 h) também cabe no limite das regras', async () => {
+    const tres = ['2026-12-01_0900', '2026-12-01_1000', '2026-12-01_1100'];
+    const antigo = await marcar(tres);
+    await assertSucceeds(
+      remarcarPedido(antigo, tres, ['2026-12-03_1400', '2026-12-03_1500', '2026-12-03_1600']),
+    );
+  });
+
+  it('não solta trava de outra pessoa nem com a chave errada', async () => {
+    const antigo = await marcar(['2026-12-01_0900']);
+    await reservarOutra('2026-12-02_0900');
+    await assertFails(remarcarPedido(antigo, ['2026-12-02_0900'], ['2026-12-03_1400']));
+    await assertFails(
+      remarcarPedido(antigo, ['2026-12-01_0900'], ['2026-12-03_1500'], 'outraChaveQualquer12345'),
+    );
+  });
+
+  it('com menos de 24 h, não remarca nem pede cancelamento', async () => {
+    const antigo = await marcar(['2026-12-01_0900'], 12);
+    await assertFails(remarcarPedido(antigo, ['2026-12-01_0900'], ['2026-12-03_1400']));
+    await assertFails(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: antigo,
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('pede cancelamento de um horário recém-marcado', async () => {
+    const antigo = await marcar(['2026-12-01_0900']);
+    await assertSucceeds(
+      visitante().collection('solicitacoes').add({
+        tipo: 'cancelamento',
+        chave: CHAVE,
+        horario: antigo,
+        criadoEm: serverTimestamp(),
+      }),
+    );
+  });
+
+  async function reservarOutra(id: string) {
+    const db = visitante();
+    const ref = db.collection('pedidos').doc();
+    const [data, hora] = id.split('_');
+    const lote = db.batch();
+    lote.set(db.doc(`travas/${id}`), { data, hora, expiraEm: null, pedidoId: ref.id });
+    lote.set(ref, pedido([id], { status: 'confirmado' }));
+    await lote.commit();
+  }
 });

@@ -25,19 +25,18 @@ export type Configuracoes = {
   /** WhatsApp da manicure (55 + DDD + número) ou '' se ainda não informado. */
   whatsapp: string;
   endereco: string;
+  /** Usuário do Instagram, sem @ ('' se não tiver). */
+  instagram: string;
   expediente: FaixaExpediente[];
   /** Folga depois de cada atendimento (RN04). */
   intervaloMin: number;
   /** Quanto antes a cliente precisa pedir o horário (RN03). */
   antecedenciaMin: number;
-  /** Até quantos dias à frente a cliente pode pedir. */
-  janelaDias: number;
 };
 
-/** Os horários andam em blocos de 30 min, então o intervalo também. */
-export const INTERVALOS_MIN = [0, 30, 60];
+/** Os horários andam de hora em hora, então o intervalo também. */
+export const INTERVALOS_MIN = [0, 60];
 export const ANTECEDENCIAS_MIN = [0, 60, 120, 240, 720, 1440, 2880];
-export const JANELAS_DIAS = [7, 14, 30, 60, 90];
 
 /** Horas oferecidas para início e fim do expediente: 05:00 a 23:00, de 30 em 30 min. */
 export const HORAS_EXPEDIENTE = Array.from({ length: 37 }, (_, i) => {
@@ -53,10 +52,10 @@ export const CONFIGURACOES_PADRAO: Configuracoes = {
   slug: '',
   whatsapp: '',
   endereco: '',
+  instagram: '',
   expediente: [1, 2, 3, 4, 5, 6].map((dia) => ({ dia, ...DIA_PADRAO })),
   intervaloMin: 0,
   antecedenciaMin: 120,
-  janelaDias: 30,
 };
 
 export const expedienteDoDia = (expediente: readonly FaixaExpediente[], dia: number): Faixa[] =>
@@ -106,6 +105,17 @@ export const esquemaConfiguracoes = z.object({
     return numero;
   }),
   endereco: z.string().trim().max(200, 'Use até 200 letras no endereço.'),
+  instagram: z.string().transform((texto, ctx) => {
+    const usuario = usuarioInstagram(texto);
+    if (usuario === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Escreva o seu @ do Instagram, por exemplo @espacojuju.',
+      });
+      return z.NEVER;
+    }
+    return usuario;
+  }),
   dias: z
     .array(esquemaDia)
     .length(7)
@@ -122,7 +132,6 @@ export const esquemaConfiguracoes = z.object({
     }),
   intervaloMin: escolhaDaLista(INTERVALOS_MIN),
   antecedenciaMin: escolhaDaLista(ANTECEDENCIAS_MIN),
-  janelaDias: escolhaDaLista(JANELAS_DIAS),
 });
 
 export type CamposConfiguracoes = z.input<typeof esquemaConfiguracoes>;
@@ -137,12 +146,12 @@ export const paraConfiguracoes = (d: DadosConfiguracoes, slugAtual = ''): Config
   slug: slugAtual || gerarSlug(d.nome) || 'agenda',
   whatsapp: d.whatsapp,
   endereco: d.endereco,
+  instagram: d.instagram,
   expediente: d.dias.flatMap((dia, i) =>
     dia.aberto ? [{ dia: i, ini: dia.ini, fim: dia.fim }] : [],
   ),
   intervaloMin: d.intervaloMin,
   antecedenciaMin: d.antecedenciaMin,
-  janelaDias: d.janelaDias,
 });
 
 /** Preenche o formulário; dia fechado mostra o horário padrão se for aberto. */
@@ -150,13 +159,30 @@ export const paraCampos = (c: Configuracoes): CamposConfiguracoes => ({
   nome: c.nome,
   whatsapp: c.whatsapp && formatarWhatsApp(c.whatsapp),
   endereco: c.endereco,
+  instagram: c.instagram && `@${c.instagram}`,
   dias: DIAS_SEMANA.map((_, i) => {
     const faixa = c.expediente.find((f) => f.dia === i);
     return faixa
       ? { aberto: true, ini: faixa.ini, fim: faixa.fim }
       : { aberto: false, ...DIA_PADRAO };
   }),
-  intervaloMin: String(c.intervaloMin),
+  // intervalo antigo de 30 min já reservava a hora seguinte inteira
+  intervaloMin: String(c.intervaloMin > 0 ? 60 : 0),
   antecedenciaMin: String(c.antecedenciaMin),
-  janelaDias: String(c.janelaDias),
 });
+
+const USUARIO_INSTAGRAM = /^[a-z0-9._]{1,30}$/;
+
+/**
+ * "@espacojuju", "espacojuju" ou o link do perfil → "espacojuju"; vazio → "".
+ * `null` se não parece um usuário do Instagram.
+ */
+export function usuarioInstagram(texto: string): string | null {
+  const limpo = texto.trim().toLowerCase();
+  if (!limpo) return '';
+  const doLink = /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^/?#]+)/.exec(limpo);
+  const usuario = (doLink?.[1] ?? limpo).replace(/^@/, '');
+  return USUARIO_INSTAGRAM.test(usuario) ? usuario : null;
+}
+
+export const linkInstagram = (usuario: string) => `https://www.instagram.com/${usuario}/`;

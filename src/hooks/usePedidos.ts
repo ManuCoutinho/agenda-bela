@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Agendamento } from '../dominio/agenda';
-import type { Pedido } from '../dominio/pedidos';
+import type { AvisoPendente, Pedido } from '../dominio/pedidos';
 import { observarAgendamentosDaCliente } from '../servicos/agenda';
-import { observarPedidosPendentes } from '../servicos/pedidos';
+import { observarAvisosPendentes, observarPedidosPendentes } from '../servicos/pedidos';
 
 type EstadoPedidos = { pedidos: Pedido[]; carregando: boolean; erro: boolean };
 
@@ -17,6 +17,30 @@ export function usePedidosPendentes(): EstadoPedidos {
     () =>
       observarPedidosPendentes(
         (pedidos) => setEstado({ pedidos, carregando: false, erro: false }),
+        (erro) => {
+          console.error(erro);
+          setEstado((anterior) => ({ ...anterior, carregando: false, erro: true }));
+        },
+      ),
+    [],
+  );
+
+  return estado;
+}
+
+type EstadoAvisos = { avisos: AvisoPendente[]; carregando: boolean; erro: boolean };
+
+export function useAvisosPendentes(): EstadoAvisos {
+  const [estado, setEstado] = useState<EstadoAvisos>({
+    avisos: [],
+    carregando: true,
+    erro: false,
+  });
+
+  useEffect(
+    () =>
+      observarAvisosPendentes(
+        (avisos) => setEstado({ avisos, carregando: false, erro: false }),
         (erro) => {
           console.error(erro);
           setEstado((anterior) => ({ ...anterior, carregando: false, erro: true }));

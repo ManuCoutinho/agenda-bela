@@ -1,5 +1,6 @@
 import { FirebaseError } from 'firebase/app';
 import {
+  arrayUnion,
   collection,
   deleteField,
   doc,
@@ -12,16 +13,21 @@ import {
   where,
   writeBatch,
   type DocumentData,
+  type DocumentReference,
+  type WriteBatch,
 } from 'firebase/firestore';
-import { HorarioOcupado, travaLivre } from '../dominio/agenda';
+import { HorarioOcupado, inicioEm, travaLivre } from '../dominio/agenda';
+import { idPedidoDaSerie } from '../dominio/series';
 import {
-  expiracaoDoPedido,
   HorarioJaPedido,
   pedidoExpirado,
+  type Aviso,
+  type AvisoPendente,
   type DadosPedido,
   type OutroHorario,
   type Pedido,
   type StatusPedido,
+  type TipoAviso,
 } from '../dominio/pedidos';
 import type { Servico } from '../dominio/servicos';
 import { db, gravarEmSegundoPlano } from './firebase';
@@ -40,31 +46,55 @@ export class SemInternet extends Error {
 }
 
 /**
- * RF09: a cliente pede o horário. Num só lote grava as travas (pendentes por
- * até 24 h) e o pedido. Se alguma trava já estiver ativa, as regras recusam o
- * lote inteiro e nada é gravado: lança `HorarioJaPedido`.
+ * RF09/I08: a cliente marca o horário, já confirmado. Num só lote grava o pedido
+ * `confirmado` e as travas definitivas dele. Se alguma trava já estiver ocupada,
+ * as regras recusam o lote inteiro e nada é gravado: lança `HorarioJaPedido`.
  */
-export async function reservar(
-  dados: DadosPedido & { servicoId: string; inicio: Date; travas: string[] },
-): Promise<void> {
+type DadosReserva = Pick<DadosPedido, 'nome' | 'whatsapp'> & {
+  servicoId: string;
+  inicio: Date;
+  travas: string[];
+  /** I13: chave do aparelho, para "Meus horários". */
+  chave?: string;
+};
+
+/** Devolve o id do pedido (o aparelho guarda para remarcar e cancelar). */
+export async function reservar(dados: DadosReserva): Promise<string> {
   if (!navigator.onLine) throw new SemInternet();
-  const expiraEm = Timestamp.fromDate(expiracaoDoPedido(new Date()));
+  const ref = doc(pedidos);
   const lote = writeBatch(db);
+  incluirReserva(lote, ref, dados);
+  await gravarReserva(lote);
+  return ref.id;
+}
+
+/** Pedido confirmado e as travas definitivas dele, no lote. */
+function incluirReserva(
+  lote: WriteBatch,
+  ref: DocumentReference,
+  dados: DadosReserva,
+  extra: Record<string, unknown> = {},
+) {
   for (const id of dados.travas) {
     const [data, hora] = id.split('_');
-    lote.set(doc(travas, id), { data, hora, expiraEm });
+    lote.set(doc(travas, id), { data, hora, expiraEm: null, pedidoId: ref.id });
   }
-  lote.set(doc(pedidos), {
+  lote.set(ref, {
     nome: dados.nome,
     whatsapp: dados.whatsapp,
     servicoId: dados.servicoId,
     inicio: Timestamp.fromDate(dados.inicio),
     consentimento: true,
-    status: 'pendente',
+    status: 'confirmado',
     criadoEm: serverTimestamp(),
     travas: dados.travas,
+    ...(dados.chave ? { chave: dados.chave } : {}),
+    ...extra,
   });
+}
 
+/** Grava esperando o servidor; horário tomado vira `HorarioJaPedido`. */
+async function gravarReserva(lote: WriteBatch) {
   let espera: ReturnType<typeof setTimeout> | undefined;
   const tempoEsgotado = new Promise<never>((_, rejeitar) => {
     espera = setTimeout(() => rejeitar(new SemInternet()), ESPERA_MS);
@@ -85,7 +115,13 @@ const agendamentos = collection(db, 'agendamentos');
 const clientes = collection(db, 'clientes');
 
 const paraData = (v: unknown) => (v instanceof Timestamp ? v.toDate() : null);
-const STATUS: readonly StatusPedido[] = ['pendente', 'aprovado', 'recusado', 'expirado'];
+const STATUS: readonly StatusPedido[] = [
+  'pendente',
+  'confirmado',
+  'aprovado',
+  'recusado',
+  'expirado',
+];
 
 const paraPedido = (id: string, d: DocumentData): Pedido => ({
   id,
@@ -97,15 +133,20 @@ const paraPedido = (id: string, d: DocumentData): Pedido => ({
   status: STATUS.includes(d.status) ? d.status : 'pendente',
   // logo após o envio, o horário do servidor ainda não chegou
   criadoEm: paraData(d.criadoEm) ?? new Date(),
+  serieId: typeof d.serieId === 'string' ? d.serieId : undefined,
+  semAviso: d.semAviso === true ? true : undefined,
+  chave: typeof d.chave === 'string' ? d.chave : undefined,
+  substitui: typeof d.substitui === 'string' ? d.substitui : undefined,
+  substituiInicio: paraData(d.substituiInicio) ?? undefined,
 });
 
-/** Pedidos esperando resposta, do mais próximo ao mais distante (RF10). */
-export function observarPedidosPendentes(
+function observarPorStatus(
+  status: StatusPedido,
   aoMudar: (pedidos: Pedido[]) => void,
   aoFalhar: (erro: Error) => void,
 ) {
   return onSnapshot(
-    query(pedidos, where('status', '==', 'pendente')),
+    query(pedidos, where('status', '==', status)),
     (snap) =>
       aoMudar(
         snap.docs
@@ -116,47 +157,161 @@ export function observarPedidosPendentes(
   );
 }
 
+/** Pedidos esperando resposta, do mais próximo ao mais distante (RF10). */
+export const observarPedidosPendentes = (
+  aoMudar: (pedidos: Pedido[]) => void,
+  aoFalhar: (erro: Error) => void,
+) => observarPorStatus('pendente', aoMudar, aoFalhar);
+
+/** I08: horários que as clientes já confirmaram e ainda não viraram atendimento. */
+export const observarPedidosConfirmados = (
+  aoMudar: (pedidos: Pedido[]) => void,
+  aoFalhar: (erro: Error) => void,
+) => observarPorStatus('confirmado', aoMudar, aoFalhar);
+
+const TIPOS_AVISO: readonly TipoAviso[] = ['confirmacao', 'troca', 'recusa'];
+
+const paraAviso = (pedidoId: string, d: DocumentData): AvisoPendente[] => {
+  const aviso: unknown = d.aviso;
+  if (typeof aviso !== 'object' || aviso === null) return [];
+  const { tipo, texto } = aviso as Record<string, unknown>;
+  if (!TIPOS_AVISO.includes(tipo as TipoAviso) || typeof texto !== 'string') return [];
+  return [
+    {
+      pedidoId,
+      nome: String(d.nome ?? ''),
+      whatsapp: String(d.whatsapp ?? ''),
+      inicio: paraData(d.inicio) ?? new Date(0),
+      tipo: tipo as TipoAviso,
+      texto,
+      agendamentoId: typeof d.agendamentoId === 'string' ? d.agendamentoId : undefined,
+    },
+  ];
+};
+
+/** Respostas já dadas cuja mensagem ainda não foi mandada à cliente (RF10). */
+export function observarAvisosPendentes(
+  aoMudar: (avisos: AvisoPendente[]) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    query(pedidos, where('avisadoEm', '==', null)),
+    (snap) =>
+      aoMudar(
+        snap.docs
+          .flatMap((d) => paraAviso(d.id, d.data()))
+          .sort((a, b) => a.inicio.getTime() - b.inicio.getTime()),
+      ),
+    aoFalhar,
+  );
+}
+
+/**
+ * A manicure abriu (ou dispensou) a mensagem: o aviso sai da fila e, se era
+ * confirmação, o atendimento fica como "confirmação enviada" (I10). Funciona offline.
+ */
+export function marcarAvisado(aviso: Pick<AvisoPendente, 'pedidoId' | 'tipo' | 'agendamentoId'>) {
+  const lote = writeBatch(db);
+  lote.update(doc(pedidos, aviso.pedidoId), { avisadoEm: serverTimestamp() });
+  if (aviso.tipo !== 'recusa' && aviso.agendamentoId) {
+    lote.update(doc(agendamentos, aviso.agendamentoId), { confirmacaoEm: serverTimestamp() });
+  }
+  gravarEmSegundoPlano(lote.commit());
+}
+
 /**
  * RF10: aprova numa transação – confirma as travas (`expiraEm: null`), cria o
- * atendimento (e a cliente, se ainda não existe) e marca o pedido como aprovado.
+ * atendimento (e a cliente, se ainda não existe), marca o pedido como aprovado
+ * e guarda nele a mensagem a mandar.
  * Se o pedido expirou (RN02) e outra pessoa pegou o horário, lança `HorarioOcupado`.
  */
 export async function aprovarPedido(
   pedido: Pedido,
   servico: Pick<Servico, 'id' | 'nome' | 'duracaoMin'> & { precoCentavos?: number },
   {
+    aviso,
     clienteId,
     substitui,
     sinalCentavos,
   }: {
+    /** Mensagem para a fila de avisos; sem ela, nada entra na fila. */
+    aviso?: Aviso;
     clienteId?: string;
     /** Troca de horário: o atendimento ou pedido antigo da cliente. */
     substitui?: OutroHorario;
     /** Sinal pedido na confirmação (não se aplica à troca). */
     sinalCentavos?: number;
-  } = {},
+  },
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const agora = new Date();
-    const expirado = pedidoExpirado(pedido, agora);
+    const atual = await tx.get(doc(pedidos, pedido.id));
+    const status = atual.data()?.status;
+    // já virou atendimento (outra aba ou outra abertura do app): nada a fazer
+    if (status !== 'pendente' && status !== 'confirmado') return;
+    // cliente nova tem id fixo pelo WhatsApp: várias datas convertidas ao mesmo tempo
+    // (horário fixo) caem na mesma cliente em vez de criar uma por data
+    const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes, `wa-${pedido.whatsapp}`);
+    const clienteExiste = clienteId ? true : (await tx.get(cliente)).exists();
+    // I14: a cliente pode ter remarcado um horário que ainda era só pedido (ela
+    // remarca pelo pedido antes de a dona abrir o app): `substitui` é o id dele
+    const antigoSnap = pedido.substitui ? await tx.get(doc(pedidos, pedido.substitui)) : null;
+    const antigoPedido = antigoSnap?.exists() ? antigoSnap.data() : null;
+    const moverAtendimento = !pedido.substitui
+      ? null
+      : !antigoPedido
+        ? pedido.substitui
+        : typeof antigoPedido.agendamentoId === 'string'
+          ? antigoPedido.agendamentoId
+          : null;
+    const expirado = status === 'pendente' && pedidoExpirado(pedido, agora);
     const antigas = travasQueSaem(substitui, agora);
+    let foiRemarcado = false;
     for (const id of pedido.travas) {
       if (antigas.includes(id)) continue;
       const snap = await tx.get(doc(travas, id));
+      // a própria cliente soltou este horário ao remarcar: o pedido não vira atendimento
+      if (snap.data()?.horario === pedido.id && snap.data()?.liberadaPor) {
+        foiRemarcado = true;
+        continue;
+      }
       const expiraEm = snap.exists() ? paraData(snap.data().expiraEm) : undefined;
-      // dentro das 24 h a trava pendente é deste pedido; depois, só se ficou livre
-      const nossa = !expirado && expiraEm !== null && expiraEm !== undefined;
+      // pedido confirmado (I08): a trava definitiva é dele; pendente: só dentro das 24 h
+      const nossa =
+        snap.data()?.pedidoId === pedido.id ||
+        (!expirado && expiraEm !== null && expiraEm !== undefined);
       if (!nossa && !travaLivre(expiraEm, agora)) throw new HorarioOcupado();
+    }
+    if (foiRemarcado) {
+      tx.update(doc(pedidos, pedido.id), {
+        status: 'recusado',
+        respondidoEm: serverTimestamp(),
+        avisadoEm: serverTimestamp(),
+      });
+      return;
     }
 
     for (const id of pedido.travas) {
       const [data, hora] = id.split('_');
-      tx.set(doc(travas, id), { data, hora, expiraEm: null });
+      // o pedidoId fica na trava: a cliente pode remarcar pelo pedido (I14)
+      tx.set(doc(travas, id), { data, hora, expiraEm: null, pedidoId: pedido.id });
     }
     for (const id of antigas.filter((t) => !pedido.travas.includes(t))) {
       tx.delete(doc(travas, id));
     }
-    tx.update(doc(pedidos, pedido.id), { status: 'aprovado', respondidoEm: serverTimestamp() });
+    // I14: remarcação da cliente move o atendimento dela; as travas antigas ela já soltou
+    const atendimento =
+      substitui?.tipo === 'agendamento'
+        ? doc(agendamentos, substitui.agendamento.id)
+        : moverAtendimento
+          ? doc(agendamentos, moverAtendimento)
+          : doc(agendamentos);
+    tx.update(doc(pedidos, pedido.id), {
+      status: 'aprovado',
+      respondidoEm: serverTimestamp(),
+      ...(aviso ? { aviso, avisadoEm: null } : { avisadoEm: serverTimestamp() }),
+      agendamentoId: atendimento.id,
+    });
 
     const dadosDoServico = {
       servicoId: servico.id,
@@ -166,13 +321,16 @@ export async function aprovarPedido(
       inicio: Timestamp.fromDate(pedido.inicio),
       travas: pedido.travas,
       pedidoId: pedido.id,
+      ...(pedido.serieId ? { serieId: pedido.serieId } : {}),
       atualizadoEm: serverTimestamp(),
     };
-    if (substitui?.tipo === 'agendamento') {
+    if (substitui?.tipo === 'agendamento' || moverAtendimento) {
       // o atendimento muda de horário: o lembrete do dia antigo não vale mais
-      tx.update(doc(agendamentos, substitui.agendamento.id), {
+      tx.update(atendimento, {
         ...dadosDoServico,
+        ...(moverAtendimento ? { status: 'marcado' } : {}),
         lembreteEm: deleteField(),
+        confirmacaoEm: deleteField(),
       });
       return;
     }
@@ -182,19 +340,30 @@ export async function aprovarPedido(
         respondidoEm: serverTimestamp(),
       });
     }
+    // remarcou um horário que ainda não era atendimento: o pedido antigo sai
+    if (pedido.substitui && antigoPedido) {
+      tx.update(doc(pedidos, pedido.substitui), {
+        status: 'recusado',
+        respondidoEm: serverTimestamp(),
+        avisadoEm: serverTimestamp(),
+      });
+    }
 
-    const cliente = clienteId ? doc(clientes, clienteId) : doc(clientes);
-    if (!clienteId) {
+    if (clienteExiste && pedido.chave) {
+      tx.update(cliente, { chaves: arrayUnion(pedido.chave) });
+    }
+    if (!clienteExiste) {
       tx.set(cliente, {
         nome: pedido.nome,
         whatsapp: pedido.whatsapp,
         observacao: '',
         consentimento: true,
+        ...(pedido.chave ? { chaves: [pedido.chave] } : {}),
         criadoEm: serverTimestamp(),
         atualizadoEm: serverTimestamp(),
       });
     }
-    tx.set(doc(agendamentos), {
+    tx.set(atendimento, {
       clienteId: cliente.id,
       clienteNome: pedido.nome,
       clienteWhatsapp: pedido.whatsapp,
@@ -223,12 +392,18 @@ function travasQueSaem(substitui: OutroHorario | undefined, agora: Date): string
  * Recusa e solta as travas. Depois de 24 h as travas já soltaram sozinhas e
  * podem ser de outra pessoa: aí só o pedido muda. Funciona offline.
  */
-export function recusarPedido(pedido: Pedido) {
+export function recusarPedido(pedido: Pedido, texto: string) {
   const lote = writeBatch(db);
   if (!pedidoExpirado(pedido, new Date())) {
     for (const id of pedido.travas) lote.delete(doc(travas, id));
   }
-  lote.update(doc(pedidos, pedido.id), { status: 'recusado', respondidoEm: serverTimestamp() });
+  const aviso: Aviso = { tipo: 'recusa', texto };
+  lote.update(doc(pedidos, pedido.id), {
+    status: 'recusado',
+    respondidoEm: serverTimestamp(),
+    aviso,
+    avisadoEm: null,
+  });
   gravarEmSegundoPlano(lote.commit());
 }
 
@@ -236,5 +411,138 @@ export function recusarPedido(pedido: Pedido) {
 export function descartarPedido(pedido: Pedido) {
   gravarEmSegundoPlano(
     updateDoc(doc(pedidos, pedido.id), { status: 'expirado', respondidoEm: serverTimestamp() }),
+  );
+}
+
+export type FalhaSerie = { data: string; motivo: 'ocupado' | 'sem-internet' | 'erro' };
+
+/**
+ * I11: horário fixo pedido pela cliente. Cada data é um lote (pedido + travas)
+ * e falha sozinha se o horário estiver tomado; a série vai junto com a
+ * primeira data que der certo. Devolve as datas reservadas e as que falharam.
+ */
+export async function reservarSerie(
+  dados: Pick<DadosPedido, 'nome' | 'whatsapp'> & {
+    servicoId: string;
+    hora: string;
+    frequenciaDias: number;
+    datas: readonly string[];
+    travasDe: (data: string) => string[];
+    chave?: string;
+  },
+): Promise<{ serieId: string; reservadas: string[]; falhas: FalhaSerie[] }> {
+  if (!navigator.onLine) throw new SemInternet();
+  const serie = doc(collection(db, 'series'));
+  const reservadas: string[] = [];
+  const falhas: FalhaSerie[] = [];
+  for (const data of dados.datas) {
+    const lote = writeBatch(db);
+    if (reservadas.length === 0) {
+      lote.set(serie, {
+        nome: dados.nome,
+        whatsapp: dados.whatsapp,
+        servicoId: dados.servicoId,
+        hora: dados.hora,
+        frequenciaDias: dados.frequenciaDias,
+        primeiraData: dados.datas[0],
+        ativa: true,
+        criadoEm: serverTimestamp(),
+      });
+    }
+    incluirReserva(
+      lote,
+      doc(pedidos, idPedidoDaSerie(serie.id, data)),
+      {
+        nome: dados.nome,
+        whatsapp: dados.whatsapp,
+        servicoId: dados.servicoId,
+        inicio: inicioEm(data, dados.hora),
+        travas: dados.travasDe(data),
+        chave: dados.chave,
+      },
+      { serieId: serie.id },
+    );
+    try {
+      await gravarReserva(lote);
+      reservadas.push(data);
+    } catch (erro) {
+      if (!(erro instanceof HorarioJaPedido) && !(erro instanceof SemInternet)) {
+        console.error(erro);
+      }
+      falhas.push({
+        data,
+        motivo:
+          erro instanceof HorarioJaPedido
+            ? 'ocupado'
+            : erro instanceof SemInternet
+              ? 'sem-internet'
+              : 'erro',
+      });
+    }
+  }
+  return { serieId: serie.id, reservadas, falhas };
+}
+
+/**
+ * I14: a cliente troca um horário dela (de "Meus horários") por outro, na
+ * hora: num só lote marca o novo (pedido confirmado que substitui o antigo) e
+ * solta as travas do antigo. As regras só aceitam com 24 h ou mais de
+ * antecedência e com a chave do aparelho dela.
+ */
+export async function remarcar(
+  dados: DadosReserva & {
+    chave: string;
+    antigo: { id: string; inicio: Date; travas: readonly string[] };
+  },
+): Promise<string> {
+  if (!navigator.onLine) throw new SemInternet();
+  const ref = doc(pedidos);
+  const lote = writeBatch(db);
+  incluirReserva(lote, ref, dados, {
+    substitui: dados.antigo.id,
+    substituiInicio: Timestamp.fromDate(dados.antigo.inicio),
+  });
+  for (const id of dados.antigo.travas.filter((t) => !dados.travas.includes(t))) {
+    const [data, hora] = id.split('_');
+    lote.set(doc(travas, id), {
+      data,
+      hora,
+      expiraEm: Timestamp.fromMillis(0),
+      liberadaPor: dados.chave,
+      horario: dados.antigo.id,
+      pedidoNovo: ref.id,
+    });
+  }
+  await gravarReserva(lote);
+  return ref.id;
+}
+
+/** I14: a cliente pede para cancelar; a manicure aprova ou recusa. */
+export async function pedirCancelamento(chave: string, horario: string, motivo: string) {
+  if (!navigator.onLine) throw new SemInternet();
+  await gravarReserva(
+    writeBatch(db).set(doc(collection(db, 'solicitacoes')), {
+      tipo: 'cancelamento',
+      chave,
+      horario,
+      ...(motivo.trim() ? { motivo: motivo.trim().slice(0, 200) } : {}),
+      criadoEm: serverTimestamp(),
+    }),
+  );
+}
+
+/** I14: atendimento criado a partir do pedido (`null` enquanto não virou atendimento). */
+export function observarAgendamentoDoPedido(
+  pedidoId: string,
+  aoMudar: (agendamentoId: string | null) => void,
+  aoFalhar: (erro: Error) => void,
+) {
+  return onSnapshot(
+    doc(pedidos, pedidoId),
+    (snap) => {
+      const id: unknown = snap.data()?.agendamentoId;
+      aoMudar(typeof id === 'string' ? id : null);
+    },
+    aoFalhar,
   );
 }

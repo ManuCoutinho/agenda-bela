@@ -45,7 +45,13 @@ async function principal() {
     .where('inicio', '>=', Timestamp.fromDate(de))
     .where('inicio', '<', Timestamp.fromDate(ate))
     .get();
-  const n = snap.docs.filter((d) => d.get('status') !== 'cancelado').length;
+  // I08: horário que a cliente confirmou e ainda não virou atendimento (o app não abriu)
+  const confirmados = await db.collection('pedidos').where('status', '==', 'confirmado').get();
+  const novos = confirmados.docs.filter((d) => {
+    const inicio = d.get('inicio')?.toDate();
+    return inicio && inicio >= de && inicio < ate;
+  }).length;
+  const n = snap.docs.filter((d) => d.get('status') !== 'cancelado').length + novos;
   process.stdout.write(`Atendimentos amanhã: ${n}\n`);
   if (n === 0) return;
 

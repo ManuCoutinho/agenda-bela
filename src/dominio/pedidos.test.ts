@@ -28,13 +28,16 @@ describe('pedidos (RF09, RN02)', () => {
     expect(pedidoExpirado({ criadoEm }, new Date(AGORA.getTime() + VALIDADE_PEDIDO_MS))).toBe(true);
   });
 
-  it('normaliza o WhatsApp e exige a autorização', () => {
+  it('normaliza o WhatsApp e exige nome e número', () => {
     expect(
-      esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636', consentimento: true }),
-    ).toEqual({ nome: 'Ana', whatsapp: '5541988606636', consentimento: true });
-    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123', consentimento: false });
+      esquemaPedido.parse({ nome: ' Ana ', whatsapp: '(41) 98860-6636', repetir: '7' }),
+    ).toEqual({ nome: 'Ana', whatsapp: '5541988606636', repetir: 7 });
+    expect(
+      esquemaPedido.safeParse({ nome: 'Ana', whatsapp: '41988606636', repetir: '3' }).success,
+    ).toBe(false);
+    const r = esquemaPedido.safeParse({ nome: '', whatsapp: '123', repetir: '0' });
     expect(r.success).toBe(false);
-    expect(r.error?.issues.map((i) => i.path[0])).toEqual(['nome', 'whatsapp', 'consentimento']);
+    expect(r.error?.issues.map((i) => i.path[0])).toEqual(['nome', 'whatsapp']);
   });
 
   it('mensagem do aviso no WhatsApp', () => {
@@ -45,8 +48,8 @@ describe('pedidos (RF09, RN02)', () => {
         quando: 'terça-feira, 1 de dezembro, às 09:00',
       }),
     ).toBe(
-      'Oi! Sou Ana e acabei de pedir um horário de Mão para terça-feira, 1 de dezembro, às 09:00 ' +
-        'pela sua página de agendamento. Fico no aguardo da confirmação!',
+      'Oi! Sou Ana e acabei de marcar um horário de Mão para terça-feira, 1 de dezembro, às 09:00 ' +
+        'pela sua página de agendamento. Até lá!',
     );
   });
 });

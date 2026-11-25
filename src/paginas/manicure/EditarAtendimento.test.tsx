@@ -9,7 +9,14 @@ import { useClientes } from '../../hooks/useClientes';
 import { useConfiguracoes } from '../../hooks/useConfiguracoes';
 import { useServicos } from '../../hooks/useServicos';
 import { useBloqueios } from '../../hooks/useBloqueios';
-import { cancelarAtendimento, marcarAtendimento, registrarResultado } from '../../servicos/agenda';
+import {
+  cancelarAtendimento,
+  marcarAtendimento,
+  marcarConfirmacaoEnviada,
+  registrarResultado,
+  registrarSinalPedido,
+} from '../../servicos/agenda';
+import { encerrarSerie } from '../../servicos/series';
 import { salvarCliente } from '../../servicos/clientes';
 import { escolherUmContato, temSeletorDeContatos } from '../../servicos/contatos';
 import EditarAtendimento from './EditarAtendimento';
@@ -28,7 +35,18 @@ vi.mock('../../servicos/agenda', () => ({
   marcarAtendimento: vi.fn(),
   cancelarAtendimento: vi.fn(),
   registrarResultado: vi.fn(),
+  marcarConfirmacaoEnviada: vi.fn(),
+  registrarSinalPedido: vi.fn(),
 }));
+vi.mock('../../hooks/usePagamento', () => ({
+  usePagamento: () => ({
+    pagamento: { chavePix: 'ana@pix.com', sinalPercentual: 50 },
+    carregando: false,
+    erro: false,
+  }),
+}));
+vi.mock('../../hooks/useLinkCurto', () => ({ useLinkCurto: () => 'https://is.gd/agenda' }));
+vi.mock('../../servicos/series', () => ({ encerrarSerie: vi.fn(async () => 3) }));
 
 const ANA = {
   id: 'c1',
@@ -48,7 +66,7 @@ const ATUAL: Agendamento = {
   servicoNome: 'Mão',
   duracaoMin: 60,
   inicio: inicioEm('2026-12-01', '1000'),
-  travas: ['2026-12-01_1000', '2026-12-01_1030'],
+  travas: ['2026-12-01_1000'],
   status: 'marcado',
   observacao: '',
 };
@@ -86,7 +104,7 @@ describe('EditarAtendimento (RF07)', () => {
     vi.mocked(useAgendamento).mockReturnValue({ dados: null, carregando: false, erro: false });
     vi.mocked(useBloqueios).mockReturnValue({ bloqueios: [], carregando: false, erro: false });
     vi.mocked(useOcupados).mockReturnValue({
-      dados: new Set(['1000', '1030']),
+      dados: new Set(['1000']),
       carregando: false,
       erro: false,
     });
@@ -103,7 +121,8 @@ describe('EditarAtendimento (RF07)', () => {
     renderizar('/atendimentos/novo?data=2026-12-01'); // terça
     await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
     expect(opcao('14:00 (ocupado)').disabled).toBe(true);
-    expect(opcao('13:30 (ocupado)').disabled).toBe(true); // 13:30–14:30 invade a terapia
+    expect(opcao('13:00').disabled).toBe(false); // termina às 14h, quando a terapia começa
+    expect(screen.queryByRole('option', { name: /13:30/ })).not.toBeInTheDocument();
     expect(opcao('15:00').disabled).toBe(false);
   });
 
@@ -118,7 +137,8 @@ describe('EditarAtendimento (RF07)', () => {
     await userEvent.selectOptions(screen.getByLabelText('Cliente'), 'Ana');
     await userEvent.selectOptions(screen.getByLabelText('Serviço'), 'Mão (1 h)');
 
-    expect(opcao('09:30 (ocupado)').disabled).toBe(true); // 09:30–10:30 invade as 10h
+    expect(opcao('10:00 (ocupado)').disabled).toBe(true);
+    expect(screen.queryByRole('option', { name: /09:30/ })).not.toBeInTheDocument(); // só horas cheias
     expect(opcao('11:00').disabled).toBe(false);
     expect(opcao('08:00 (fora do expediente)').disabled).toBe(false); // encaixe permitido
 
@@ -130,7 +150,7 @@ describe('EditarAtendimento (RF07)', () => {
         clienteNome: 'Ana',
         servicoNome: 'Mão',
         inicio: inicioEm('2026-12-01', '0900'),
-        travas: ['2026-12-01_0900', '2026-12-01_0930'],
+        travas: ['2026-12-01_0900'],
         status: 'marcado',
       }),
       undefined,
@@ -161,6 +181,45 @@ describe('EditarAtendimento (RF07)', () => {
       /Escolha o horário\./,
     );
     expect(marcarAtendimento).not.toHaveBeenCalled();
+  });
+
+  it('I10: atendimento futuro manda confirmação e pede o sinal pelo WhatsApp', async () => {
+    vi.mocked(useAgendamento).mockReturnValue({
+      dados: { ...ATUAL, precoCentavos: 3500, pedidoId: 'p1' },
+      carregando: false,
+      erro: false,
+    });
+    renderizar('/atendimentos/a1');
+    const confirmacao = screen.getByRole('link', { name: 'Enviar confirmação no WhatsApp' });
+    expect(decodeURIComponent(confirmacao.getAttribute('href') ?? '')).toContain(
+      'Salvar na sua agenda: https://is.gd/agenda',
+    );
+    confirmacao.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(confirmacao);
+    expect(marcarConfirmacaoEnviada).toHaveBeenCalledWith(
+      expect.objectContaining({ pedidoId: 'p1' }),
+    );
+
+    const sinal = screen.getByRole('link', { name: /Pedir sinal de R\$\s17,50 no WhatsApp/ });
+    expect(decodeURIComponent(sinal.getAttribute('href') ?? '')).toContain('Chave: ana@pix.com');
+    sinal.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(sinal);
+    expect(registrarSinalPedido).toHaveBeenCalledWith('a1', 1750);
+  });
+
+  it('I11: encerra o horário fixo depois de confirmar', async () => {
+    vi.mocked(useAgendamento).mockReturnValue({
+      dados: { ...ATUAL, serieId: 'f1' },
+      carregando: false,
+      erro: false,
+    });
+    renderizar('/atendimentos/a1');
+    await userEvent.click(screen.getByRole('button', { name: 'Encerrar horário fixo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sim, encerrar' }));
+    expect(encerrarSerie).toHaveBeenCalledWith('f1');
+    expect(
+      await screen.findByText(/Horário fixo de Ana encerrado: 3 horários ficaram livres/),
+    ).toBeInTheDocument();
   });
 
   it('ao editar, o horário atual não aparece como ocupado e as travas antigas vão junto', async () => {

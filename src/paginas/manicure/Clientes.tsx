@@ -13,8 +13,11 @@ import {
   ESTILO_ITEM_LISTA,
   ESTILO_LISTA,
 } from '../../componentes/estilos';
+import { dataDoDia, rotuloInicio } from '../../dominio/agenda';
 import { buscarClientes, formatarWhatsApp } from '../../dominio/clientes';
+import { proximoHorario } from '../../dominio/proximoHorario';
 import { linkWhatsApp } from '../../dominio/whatsapp';
+import { useAgendamentos } from '../../hooks/useAgenda';
 import { useAviso } from '../../hooks/useAviso';
 import { useClientes } from '../../hooks/useClientes';
 
@@ -24,6 +27,9 @@ export default function Clientes() {
   const aviso = useAviso();
   const idBusca = useId();
   const encontradas = buscarClientes(clientes, termo);
+  // I10: próximo horário de cada cliente (uma consulta dos próximos 4 meses)
+  const agora = new Date();
+  const { dados: futuros } = useAgendamentos(dataDoDia(agora), 120);
 
   return (
     <>
@@ -72,6 +78,7 @@ export default function Clientes() {
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">{c.nome}</span>
                     <span className="text-texto-suave">{formatarWhatsApp(c.whatsapp)}</span>
+                    <ProximoDaCliente agendamentos={futuros} whatsapp={c.whatsapp} agora={agora} />
                   </span>
                 </Link>
                 <a
@@ -91,5 +98,24 @@ export default function Clientes() {
       <Fab to="/clientes/nova" rotulo="Nova cliente" />
       <Aviso texto={aviso} />
     </>
+  );
+}
+
+function ProximoDaCliente({
+  agendamentos,
+  whatsapp,
+  agora,
+}: {
+  agendamentos: Parameters<typeof proximoHorario>[0];
+  whatsapp: string;
+  agora: Date;
+}) {
+  const proximo = proximoHorario(agendamentos, whatsapp, agora);
+  if (!proximo) return null;
+  return (
+    <span className="text-marca-escura">
+      Próximo horário: {rotuloInicio(proximo.inicio)}
+      {proximo.confirmacaoEnviadaEm ? ' · confirmação enviada' : ''}
+    </span>
   );
 }

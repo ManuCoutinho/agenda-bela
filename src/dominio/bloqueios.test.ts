@@ -32,10 +32,13 @@ const DENTISTA: Bloqueio = {
 const PASSADO: Bloqueio = { ...DENTISTA, id: 'p0', data: '2026-11-03' };
 
 describe('bloqueios (RF05, RF06)', () => {
-  it('travas de 30 min do intervalo, sem incluir o fim', () => {
+  it('travas das horas que o intervalo toca, sem incluir o fim', () => {
     expect(travasDoIntervalo('2026-11-17', '09:00', '10:30')).toEqual([
       '2026-11-17_0900',
-      '2026-11-17_0930',
+      '2026-11-17_1000',
+    ]);
+    expect(travasDoIntervalo('2026-11-17', '09:30', '11:00')).toEqual([
+      '2026-11-17_0900',
       '2026-11-17_1000',
     ]);
   });
@@ -49,11 +52,7 @@ describe('bloqueios (RF05, RF06)', () => {
   });
 
   it('horas dos recorrentes no dia (os pontuais já têm trava)', () => {
-    expect([...horasRecorrentesNoDia([TERAPIA, DENTISTA], '2026-11-24')]).toEqual([
-      '1400',
-      '1430',
-      '1500',
-    ]);
+    expect([...horasRecorrentesNoDia([TERAPIA, DENTISTA], '2026-11-24')]).toEqual(['1400', '1500']);
   });
 
   it('a página pública recebe só dia e horário dos recorrentes, sem a descrição', () => {
@@ -76,10 +75,10 @@ describe('bloqueios (RF05, RF06)', () => {
 });
 
 describe('restoDoDia', () => {
-  it('do próximo meio-horário até as 22h', () => {
+  it('da próxima hora cheia até as 22h', () => {
     expect(restoDoDia(inicioEm('2026-11-12', '1510'), [{ ini: '09:00', fim: '18:00' }])).toEqual({
       data: '2026-11-12',
-      ini: '15:30',
+      ini: '16:00',
       fim: '22:00',
     });
   });
@@ -93,7 +92,7 @@ describe('restoDoDia', () => {
   });
 
   it('null quando o dia já acabou', () => {
-    expect(restoDoDia(inicioEm('2026-11-12', '2145'), [])).toBeNull();
+    expect(restoDoDia(inicioEm('2026-11-12', '2110'), [])).toBeNull();
   });
 });
 

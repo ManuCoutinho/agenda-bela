@@ -8,6 +8,7 @@ import EditarCliente from './EditarCliente';
 
 vi.mock('../../hooks/useClientes', () => ({ useClientes: vi.fn() }));
 vi.mock('../../servicos/clientes', () => ({ salvarCliente: vi.fn() }));
+vi.mock('./ProximoHorarioCliente', () => ({ default: () => null }));
 
 function Lista() {
   const aviso = (useLocation().state as { aviso?: string } | null)?.aviso;

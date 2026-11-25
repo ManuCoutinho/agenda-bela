@@ -3,7 +3,14 @@ import { addDays, addMinutes, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { z } from 'zod';
 import { esquemaCliente } from './clientes';
-import { blocosNecessarios, hhmm, PASSO, type Faixa } from './disponibilidade';
+import {
+  arredondarHora,
+  blocosNecessarios,
+  hhmm,
+  PASSO,
+  porHora,
+  type Faixa,
+} from './disponibilidade';
 
 export const FUSO = 'America/Sao_Paulo';
 
@@ -25,7 +32,7 @@ export type Agendamento = {
   servicoNome: string;
   duracaoMin: number;
   inicio: Date;
-  /** IDs `AAAA-MM-DD_HHmm` dos blocos de 30 min ocupados (inclui o intervalo). */
+  /** IDs `AAAA-MM-DD_HH00` das horas ocupadas (inclui o intervalo). */
   travas: string[];
   status: StatusAgendamento;
   observacao: string;
@@ -35,6 +42,14 @@ export type Agendamento = {
   sinalCentavos?: number;
   /** A manicure já tocou em "Enviar lembrete" (RF11). */
   lembreteEnviado?: boolean;
+  /** Pedido da página pública que originou o atendimento. */
+  pedidoId?: string;
+  /** I11: atendimento de um horário fixo. */
+  serieId?: string;
+  /** I10: quando a confirmação foi enviada pelo WhatsApp. */
+  confirmacaoEnviadaEm?: Date;
+  /** I10: quando o sinal foi pedido pelo WhatsApp. */
+  sinalPedidoEm?: Date;
 };
 
 export type NovoAgendamento = Omit<Agendamento, 'id'>;
@@ -92,12 +107,18 @@ export const somarDias = (data: string, dias: number) =>
 export const diasAPartirDe = (data: string, n: number) =>
   Array.from({ length: n }, (_, i) => somarDias(data, i));
 
-/** Travas de 30 min que o atendimento ocupa, contando o intervalo depois dele. */
+const HORA_MS = 3_600_000;
+
+/**
+ * Horas (travas `AAAA-MM-DD_HH00`) que o atendimento toca, contando o intervalo
+ * depois dele. Um atendimento antigo que começa às 09:30 ocupa as 09:00.
+ */
 export function idsTravas(inicio: Date, duracaoMin: number, intervaloMin: number): string[] {
-  const total = blocosNecessarios(duracaoMin, intervaloMin);
+  const fim = inicio.getTime() + (duracaoMin + intervaloMin) * 60_000;
+  // o fuso de São Paulo é de horas inteiras: a hora cheia em UTC também é em SP
   const ids: string[] = [];
-  for (let t = 0; t < total; t += PASSO) {
-    ids.push(format(noFuso(addMinutes(inicio, t)), "yyyy-MM-dd'_'HHmm"));
+  for (let t = Math.floor(inicio.getTime() / HORA_MS) * HORA_MS; t < fim; t += HORA_MS) {
+    ids.push(format(noFuso(new Date(t)), "yyyy-MM-dd'_'HHmm"));
   }
   return ids;
 }
@@ -115,7 +136,7 @@ export type OpcaoHorario = { hora: string; livre: boolean; noExpediente: boolean
 const emMinutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3));
 
 /**
- * Horários de início para a manicure marcar no dia, de 30 em 30 min.
+ * Horários de início para a manicure marcar no dia, de hora em hora.
  * `ocupados` são as horas (HHmm) com trava ativa nesse dia, sem as do próprio
  * atendimento quando ele está sendo editado. `expediente` são as faixas de
  * trabalho desse dia; fora delas o horário é oferecido, mas sinalizado.
@@ -127,14 +148,15 @@ export function horariosParaMarcar(
   expediente: readonly Faixa[],
 ): OpcaoHorario[] {
   const faixas = expediente.map((f) => ({ ini: emMinutos(f.ini), fim: emMinutos(f.fim) }));
-  const primeiro = Math.min(FAIXA_MARCACAO.ini, ...faixas.map((f) => f.ini));
+  const primeiro = arredondarHora(Math.min(FAIXA_MARCACAO.ini, ...faixas.map((f) => f.ini)));
+  const horasOcupadas = porHora(ocupados);
   const ultimo = Math.max(FAIXA_MARCACAO.fim, ...faixas.map((f) => f.fim));
   const total = blocosNecessarios(duracaoMin, intervaloMin);
   const opcoes: OpcaoHorario[] = [];
   for (let ini = primeiro; ini + duracaoMin <= ultimo; ini += PASSO) {
     let livre = true;
     for (let t = ini; t < ini + total; t += PASSO) {
-      if (ocupados.has(hhmm(t))) livre = false;
+      if (horasOcupadas.has(hhmm(t))) livre = false;
     }
     const noExpediente = faixas.some((f) => ini >= f.ini && ini + duracaoMin <= f.fim);
     opcoes.push({ hora: hhmm(ini), livre, noExpediente });
@@ -208,3 +230,10 @@ export function atendimentosDeAmanha(agendamentos: readonly Agendamento[], agora
     (a) => a.status === 'marcado',
   );
 }
+
+/** Instante → 'terça-feira, 1 de dezembro, às 09:00' (São Paulo). */
+export const rotuloInicio = (inicio: Date) =>
+  `${rotuloDia(dataDoDia(inicio))}, às ${rotuloHora(horaDe(inicio))}`;
+
+/** Instante → '24/11, 14:32' (São Paulo), para "enviado em". */
+export const rotuloMomento = (d: Date) => format(noFuso(d), "dd/MM', 'HH:mm");

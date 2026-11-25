@@ -10,13 +10,13 @@ Produção: https://agenda-bela-bb595.web.app
 
 **Área da manicure** (login Google, só a conta dona lê e grava):
 
-- **Hoje:** atendimentos do dia, pedidos da página pública para aprovar ou recusar (com mensagem pronta no WhatsApp, troca de horário quando a cliente já tem um marcado e aprovação com sinal pelo Pix) e aviso dos lembretes de amanhã.
-- **Agenda:** calendário do mês com pontos nos dias ocupados e a lista do dia; marcar, editar e cancelar atendimento.
-- **Clientes:** cadastro com autorização LGPD, busca e importação dos contatos do celular (Contact Picker no Chrome do Android ou arquivo .vcf).
-- **Mais:** serviços, configurações (expediente, intervalo, antecedência, link público, chave Pix), bloqueios pontuais e recorrentes (com aviso de conflito e pausa da página pública), painel do mês (realizado/falta), lembretes e instalação do app.
+- **Hoje:** atendimentos do dia; fila de avisos no WhatsApp para os horários que as clientes marcaram, trocaram ou fixaram (a fila sobrevive a recarregar); pedidos de cancelamento para aprovar ou recusar; aviso dos lembretes de amanhã.
+- **Agenda:** calendário do mês com pontos nos dias ocupados e a lista do dia; marcar, editar e cancelar atendimento; no atendimento, enviar a confirmação, pedir o sinal pelo Pix e encerrar um horário fixo.
+- **Clientes:** cadastro com autorização LGPD, próximo horário de cada uma, busca e importação dos contatos do celular (Contact Picker no Chrome do Android ou arquivo .vcf).
+- **Mais:** serviços, configurações (expediente, intervalo, antecedência, link público, Instagram, chave Pix), agenda aberta (quais meses as clientes podem marcar), bloqueios pontuais e recorrentes (com aviso de conflito e pausa da página pública), painel do mês (realizado/falta), lembretes e instalação do app.
 - Funciona offline com o cache do Firestore; notificação às 18h quando há atendimento no dia seguinte.
 
-**Página pública** (`/agendar/<slug>`): a cliente escolhe serviço, dia e horário livre e envia o pedido. O horário fica reservado por travas até a manicure responder (expira em 24 h).
+**Página pública** (`/agendar/<slug>`): a cliente começa pelo WhatsApp, escolhe serviço, dia no calendário do mês (só meses abertos; dias sem horário apagados) e hora cheia. O horário fica confirmado na hora, sem esperar a manicure. Ela pode pedir horário fixo (toda semana, a cada 2 ou 4 semanas: as datas que estiverem ocupadas ficam de fora e aparecem na confirmação) e salvar na agenda do celular. No mesmo celular, "Meus horários" mostra os próximos atendimentos, com remarcar na hora e pedir cancelamento (só com 24 h ou mais de antecedência).
 
 ## Tecnologias
 
@@ -37,18 +37,18 @@ Variáveis do `.env.local`:
 | Variável                  | Para quê                                                                  |
 | ------------------------- | ------------------------------------------------------------------------- |
 | `VITE_FIREBASE_*`         | Configuração do app Web (console do Firebase → Configurações do projeto). |
-| `UID_OWNER`            | UID da conta dona; entra nas regras do Firestore quando elas são geradas. |
+| `UID_OWNER`               | UID da conta dona; entra nas regras do Firestore quando elas são geradas. |
 | `VITE_USAR_EMULADOR=true` | Aponta o app para o emulador local em vez do Firebase real.               |
 
 ## Comandos
 
-| Comando             | O que faz                                              |
-| ------------------- | ------------------------------------------------------ |
-| `pnpm dev`          | Servidor de desenvolvimento.                           |
-| `pnpm lint`         | ESLint (inclui a trava contra cores fora do tema).     |
-| `pnpm test`         | Testes de domínio e telas (Vitest, jsdom).             |
-| `pnpm test:regras`  | Testes do `firestore.rules` no emulador.               |
-| `pnpm build`        | Checagem de tipos e build de produção em `dist/`.      |
+| Comando             | O que faz                                           |
+| ------------------- | --------------------------------------------------- |
+| `pnpm dev`          | Servidor de desenvolvimento.                        |
+| `pnpm lint`         | ESLint (inclui a trava contra cores fora do tema).  |
+| `pnpm test`         | Testes de domínio e telas (Vitest, jsdom).          |
+| `pnpm test:regras`  | Testes do `firestore.rules` no emulador.            |
+| `pnpm build`        | Checagem de tipos e build de produção em `dist/`.   |
 | `pnpm regras:gerar` | Gera `.firebase/firestore.rules` com o `UID_OWNER`. |
 
 ## Estrutura
@@ -68,13 +68,16 @@ As dependências só apontam para baixo (páginas → componentes/hooks → serv
 
 ## Dados (Firestore)
 
-| Caminho                                                    | Quem acessa                                                 |
-| ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `config/publico`                                           | Leitura pública: nome, link, expediente, serviços, pausa.   |
-| `config/pagamento`, `config/notificacoes`, `config/acesso` | Só a dona.                                                  |
-| `clientes`, `agendamentos`, `bloqueios`                    | Só a dona.                                                  |
-| `pedidos`                                                  | A cliente cria (campos validados); só a dona lê e responde. |
-| `travas` (`AAAA-MM-DD_HHmm`)                               | Impedem dois pedidos no mesmo horário.                      |
+| Caminho                                                                        | Quem acessa                                                                                                     |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `config/publico`                                                               | Leitura pública: nome, link, expediente, serviços, pausa, Instagram, meses abertos (`mesesAbertos`, AAAAMM).    |
+| `config/pagamento`, `config/notificacoes`, `config/acesso`, `config/migracoes` | Só a dona.                                                                                                      |
+| `clientes`, `agendamentos`, `bloqueios`                                        | Só a dona.                                                                                                      |
+| `pedidos`                                                                      | A cliente cria já `confirmado` (campos validados, só em mês aberto); o app da dona converte em atendimento.     |
+| `travas` (`AAAA-MM-DD_HH00`, uma por hora)                                     | Impedem dois horários no mesmo lugar; criadas no mesmo lote do pedido.                                          |
+| `series`                                                                       | Horário fixo pedido pela cliente; a dona lê, reserva ao abrir um mês e encerra.                                 |
+| `portal/{chave}`                                                               | "Meus horários": cópia resumida gravada pela dona; a cliente lê só pela chave guardada no celular (sem listar). |
+| `solicitacoes`                                                                 | Pedidos de cancelamento da cliente, com 24 h ou mais; a dona aprova ou recusa.                                  |
 
 O UID da dona não fica no Git: `firestore.rules` tem o marcador `__UID_DA_MANICURE__`, trocado por `scripts/gerar-regras.mjs` antes do deploy. Trocar a dona é mudar `UID_OWNER` e publicar as regras.
 

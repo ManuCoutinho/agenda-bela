@@ -16,7 +16,16 @@ export type HorarioPortal = {
   serieId?: string;
 };
 
-export type Portal = { whatsapp: string; nome: string; horarios: HorarioPortal[] };
+export type Portal = {
+  whatsapp: string;
+  nome: string;
+  horarios: HorarioPortal[];
+  /**
+   * Pedidos que a dona já copiou para a agenda, mesmo os cancelados depois:
+   * a cópia local deles no aparelho não vale mais. Falta nos portais antigos.
+   */
+  copiados?: string[];
+};
 
 /** Chave pessoal do aparelho: 24 letras e números aleatórios (impossível de adivinhar). */
 export function gerarChave(aleatorio: (n: number) => Uint8Array): string {
@@ -44,6 +53,14 @@ export function horariosDoPortal(
     }));
 }
 
+/** Pedidos da cliente que já viraram atendimento, em qualquer situação. */
+export function pedidosCopiados(agendamentos: readonly Agendamento[], whatsapp: string): string[] {
+  return agendamentos
+    .filter((a) => a.clienteWhatsapp === whatsapp && a.pedidoId)
+    .map((a) => a.pedidoId as string)
+    .sort();
+}
+
 /**
  * Junta o que o servidor sabe (`portal`) com o que este aparelho acabou de
  * marcar e o app da manicure ainda não copiou. Mesma data e hora = o mesmo.
@@ -52,9 +69,11 @@ export function juntarHorarios(
   doServidor: readonly HorarioPortal[],
   locais: readonly HorarioPortal[],
   agora: Date,
+  copiados: readonly string[] = [],
 ): HorarioPortal[] {
   const vistos = new Set(doServidor.map((h) => h.inicio.getTime()));
-  return [...doServidor, ...locais.filter((h) => !vistos.has(h.inicio.getTime()))]
+  const novos = locais.filter((h) => !vistos.has(h.inicio.getTime()) && !copiados.includes(h.id));
+  return [...doServidor, ...novos]
     .filter((h) => h.inicio > agora)
     .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
 }

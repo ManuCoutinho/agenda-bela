@@ -352,6 +352,30 @@ describe('Página pública (RF08, RF09)', () => {
       expect(pedirCancelamento).toHaveBeenCalledWith(CHAVE, 'p1', '');
     });
 
+    it('cancelamento aprovado some, mesmo com a cópia local do pedido', () => {
+      vi.mocked(usePortal).mockReturnValue({
+        portal: { nome: 'Ana', whatsapp: '5541988606636', horarios: [], copiados: ['p1'] },
+        carregando: false,
+        erro: false,
+      });
+      localStorage.setItem(
+        'agenda-bela:horarios',
+        JSON.stringify([
+          {
+            inicio: longe.inicio.toISOString(),
+            servico: 'Mão',
+            servicoId: 's1',
+            duracaoMin: 60,
+            pedidoId: 'p1',
+            travas: longe.travas,
+          },
+        ]),
+      );
+      localStorage.setItem('agenda-bela:cancelamentos', JSON.stringify(['p1']));
+      renderizar();
+      expect(screen.queryByText(/Cancelamento pedido/)).not.toBeInTheDocument();
+    });
+
     it('com menos de 24 h, só pelo WhatsApp', () => {
       renderizar();
       expect(screen.getByText(/Faltam menos de 24 horas/)).toBeInTheDocument();

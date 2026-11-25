@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { dataDoDia } from '../dominio/agenda';
-import { horariosDoPortal } from '../dominio/portal';
+import { horariosDoPortal, pedidosCopiados } from '../dominio/portal';
 import { salvarPortal } from '../servicos/portal';
 import { useAgendamentos } from './useAgenda';
 import { useClientes } from './useClientes';
@@ -29,6 +29,7 @@ export function useSincronizarPortais() {
         whatsapp: c.whatsapp,
         nome: c.nome,
         horarios: horariosDoPortal(futuros.dados, c.whatsapp, agora),
+        copiados: pedidosCopiados(futuros.dados, c.whatsapp),
       };
       const assinatura = JSON.stringify(portal);
       for (const chave of c.chaves) {

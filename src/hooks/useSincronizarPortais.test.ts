@@ -55,6 +55,7 @@ describe('"Meus horários" atualizado pelo app da dona (I13)', () => {
       horarios: [
         expect.objectContaining({ id: 'a1', servico: 'Mão', travas: ['2099-12-01_1000'] }),
       ],
+      copiados: [],
     });
   });
 });

@@ -147,6 +147,7 @@ function Passos({ pagina }: { pagina: PaginaPublica }) {
       travas: h.travas ?? [],
     })),
     new Date(),
+    portal.portal?.copiados,
   );
 
   const regras: RegrasHorario = {

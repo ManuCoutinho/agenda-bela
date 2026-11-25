@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { inicioEm, type Agendamento } from './agenda';
-import { gerarChave, horariosDoPortal, juntarHorarios, type HorarioPortal } from './portal';
+import {
+  gerarChave,
+  horariosDoPortal,
+  juntarHorarios,
+  pedidosCopiados,
+  type HorarioPortal,
+} from './portal';
 
 const AGORA = new Date('2026-11-24T15:00:00Z');
 
@@ -61,5 +67,32 @@ describe('"Meus horários" (I13)', () => {
         AGORA,
       ).map((x) => x.id),
     ).toEqual(['a1', 'novo']);
+  });
+
+  it('a cópia local de um pedido já copiado pela dona some, mesmo cancelado depois', () => {
+    const local: HorarioPortal = {
+      id: 'p1',
+      inicio: inicioEm('2026-12-22', '1600'),
+      servico: 'Pé',
+      servicoId: 's1',
+      duracaoMin: 60,
+      travas: [],
+    };
+    expect(juntarHorarios([], [local], AGORA)).toEqual([local]);
+    expect(juntarHorarios([], [local], AGORA, ['p1'])).toEqual([]);
+  });
+
+  it('pedidos copiados da cliente, inclusive os cancelados', () => {
+    expect(
+      pedidosCopiados(
+        [
+          ag('a1', '2026-12-01', { pedidoId: 'p2', status: 'cancelado' }),
+          ag('a2', '2026-12-08', { pedidoId: 'p1' }),
+          ag('a3', '2026-12-09'),
+          ag('a4', '2026-12-10', { pedidoId: 'p3', clienteWhatsapp: '5541900000000' }),
+        ],
+        '5541988606636',
+      ),
+    ).toEqual(['p1', 'p2']);
   });
 });
